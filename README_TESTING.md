@@ -63,11 +63,33 @@ The new integration tests (`test_integration.py`) provide comprehensive testing 
   - Error recovery in realistic error conditions
   - Mixed ownership scenarios simulating real-world problems
 
+## Prerequisites
+
+### Installing pytest (Optional but Recommended)
+For enhanced testing capabilities and better reporting, install pytest:
+
+```cmd
+# Install pytest and coverage tools
+pip install pytest pytest-cov
+
+# Or install all development dependencies
+pip install -r requirements.txt
+# Then uncomment the dev dependencies in requirements.txt and run:
+# pip install pytest pytest-cov black flake8 mypy
+```
+
+### Alternative: Using Built-in unittest
+The tests are designed to work with Python's built-in unittest module, so pytest is optional but provides better output formatting and additional features.
+
 ## Running the Tests
 
 ### Run All Tests (Recommended)
 ```bash
-python test_all_core_functionality.py
+# Using the comprehensive test runner (works without pytest)
+python tests/test_all_core_functionality.py
+
+# Or using pytest (if installed)
+pytest tests/ -v
 ```
 This runs all unit tests and integration tests in a comprehensive suite.
 
