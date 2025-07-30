@@ -243,7 +243,7 @@ def test_critical_error_handling():
     # Create mock output manager
     mock_output = Mock()
     mock_output.print_general_error = Mock()
-    mock_output.is_verbose = Mock(return_value=False)
+    mock_output.get_verbose_level = Mock(return_value=0)
     
     error_manager = ErrorManager(output_manager=mock_output)
     

@@ -36,7 +36,7 @@ USAGE:
         -x, --execute   Apply ownership changes (default: dry run)
         -r, --recurse   Recurse into subdirectories
         -f, --files     Process files in addition to directories
-        -v, --verbose   Show detailed processing information
+        -v, --verbose LEVEL   Verbose output level: 0=statistics only, 1=top-level directory status, 2=directory progress, 3=detailed examination
         -q, --quiet     Suppress all output including statistics
         -ts SECONDS     Timeout after specified seconds (0 = no timeout)
 
@@ -159,6 +159,7 @@ try:
     from .output_manager import OutputManager
     from .filesystem_walker import FileSystemWalker
     from .error_manager import ErrorManager, ErrorCategory
+    from .sid_tracker import SidTracker
 except ImportError:
     # Fall back to absolute imports (when run as a script)
     import sys
@@ -168,6 +169,7 @@ except ImportError:
     from output_manager import OutputManager
     from filesystem_walker import FileSystemWalker
     from error_manager import ErrorManager, ErrorCategory
+    from sid_tracker import SidTracker
 
 
 class SecurityManager:
@@ -337,13 +339,18 @@ class SecurityManager:
                 # Log the account type for debugging (User, Group, Domain, etc.)
                 if self.error_manager and hasattr(self.error_manager, 'output_manager'):
                     output = self.error_manager.output_manager
-                    if output and output.is_verbose():
-                        account_types = {
-                            1: "User", 2: "Group", 3: "Domain", 4: "Alias", 
-                            5: "WellKnownGroup", 6: "DeletedAccount", 7: "Invalid", 8: "Unknown"
-                        }
-                        type_name = account_types.get(account_type, f"Type{account_type}")
-                        output.print_general_message(f"Resolved account type: {type_name}")
+                    if output and hasattr(output, 'get_verbose_level') and callable(output.get_verbose_level):
+                        try:
+                            if output.get_verbose_level() >= 1:
+                                account_types = {
+                                    1: "User", 2: "Group", 3: "Domain", 4: "Alias", 
+                                    5: "WellKnownGroup", 6: "DeletedAccount", 7: "Invalid", 8: "Unknown"
+                                }
+                                type_name = account_types.get(account_type, f"Type{account_type}")
+                                output.print_general_message(f"Resolved account type: {type_name}")
+                        except (TypeError, AttributeError):
+                            # Handle mock objects or other issues gracefully
+                            pass
                         
             else:
                 # Use current user - get the full username with domain
@@ -374,6 +381,7 @@ class ExecutionOptions:
     verbose: bool = False          # -v flag: Verbose output
     quiet: bool = False            # -q flag: Suppress all output
     timeout: int = 0               # -ts value: Timeout in seconds
+    track_sids: bool = False       # --track-sids flag: Enable SID tracking
     root_path: str = ""            # Positional argument: Root path to process
     owner_account: str = ""        # Target owner account
 
@@ -511,8 +519,10 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         '-v', '--verbose',
-        action='store_true',
-        help='Verbose output showing each path examined'
+        type=int,
+        default=0,
+        metavar='LEVEL',
+        help='Verbose output level: 0=statistics only, 1=top-level directory status, 2=directory progress, 3=detailed examination'
     )
     parser.add_argument(
         '-q', '--quiet',
@@ -525,6 +535,11 @@ def parse_arguments() -> argparse.Namespace:
         default=0,
         metavar='SECONDS',
         help='Terminate execution after specified seconds (0 = no timeout)'
+    )
+    parser.add_argument(
+        '--track-sids',
+        action='store_true',
+        help='Enable SID tracking and generate ownership analysis report'
     )
     
     args = parser.parse_args()
@@ -574,7 +589,7 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
         output.print_general_message(f"Target owner account: {resolved_name}")
         
         # Log additional account information in verbose mode
-        if output.is_verbose():
+        if output.get_verbose_level() >= 1:
             output.print_general_message(f"Account resolution successful for: {account_name or 'current user'}")
         
         return sid
@@ -588,7 +603,7 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
         output.print_general_error("Failed to resolve target owner account")
         
         # Suggest common solutions in verbose mode
-        if output.is_verbose():
+        if output.get_verbose_level() >= 1:
             output.print_general_message("Common solutions:")
             output.print_general_message("- Verify the account name is spelled correctly")
             output.print_general_message("- For domain accounts, use DOMAIN\\Username format")
@@ -603,7 +618,7 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
 def process_filesystem(options: ExecutionOptions, owner_sid: object, 
                       stats: StatsTracker, output: OutputManager,
                       timeout_manager: TimeoutManager, security_manager: SecurityManager,
-                      error_manager: ErrorManager) -> None:
+                      error_manager: ErrorManager, sid_tracker=None) -> None:
     """
     Process filesystem starting from root path using FileSystemWalker with comprehensive coordination.
     
@@ -629,10 +644,10 @@ def process_filesystem(options: ExecutionOptions, owner_sid: object,
     """
     # Create FileSystemWalker instance with all required dependencies
     # The walker coordinates between security operations, statistics tracking, and error handling
-    walker = FileSystemWalker(security_manager, stats, error_manager)
+    walker = FileSystemWalker(security_manager, stats, error_manager, sid_tracker)
     
     # Log the start of filesystem processing in verbose mode
-    if output.is_verbose():
+    if output.get_verbose_level() >= 1:
         mode = "EXECUTE" if options.execute else "DRY RUN"
         output.print_general_message(f"Starting filesystem processing in {mode} mode")
         output.print_general_message(f"Processing {'files and directories' if options.files else 'directories only'}")
@@ -693,6 +708,7 @@ def main() -> None:
             verbose=args.verbose,          # Whether to show detailed processing info
             quiet=args.quiet,              # Whether to suppress all output
             timeout=args.timeout,          # Maximum execution time in seconds
+            track_sids=args.track_sids,    # Whether to enable SID tracking
             root_path=args.root_path,      # Starting directory for processing
             owner_account=args.owner_account or ""  # Target owner account
         )
@@ -704,8 +720,8 @@ def main() -> None:
         # Initialize output manager with user's verbosity preferences
         # This centralizes all output formatting and stream management
         output = OutputManager(
-            verbose=options.verbose,
-            quiet=options.quiet
+            verbose_level=args.verbose,
+            quiet=args.quiet
         )
         
         # Initialize comprehensive error manager with dependencies
@@ -715,6 +731,14 @@ def main() -> None:
         # Initialize security manager with error handling integration
         # This handles all Windows security API operations with proper error handling
         security_manager = SecurityManager(error_manager=error_manager)
+        
+        # Initialize SID tracker if requested
+        # This provides comprehensive SID tracking and reporting functionality
+        sid_tracker = None
+        if options.track_sids:
+            sid_tracker = SidTracker(security_manager=security_manager)
+            if output.get_verbose_level() >= 1:
+                output.print_general_message("SID tracking enabled - ownership analysis will be generated")
         
         # PHASE 3: Security validation and privilege checking
         # Validate that we have Administrator privileges required for ownership changes
@@ -728,11 +752,11 @@ def main() -> None:
         # This prevents accidental modifications and sets user expectations
         if options.execute:
             output.print_execution_mode_notice()
-            if output.is_verbose():
+            if output.get_verbose_level() >= 1:
                 output.print_general_message("Changes will be applied to filesystem")
         else:
             output.print_dry_run_notice()
-            if output.is_verbose():
+            if output.get_verbose_level() >= 1:
                 output.print_general_message("No changes will be made - this is a simulation")
         
         # PHASE 5: Target owner account resolution and validation
@@ -750,7 +774,7 @@ def main() -> None:
         )
         
         # Log additional configuration details in verbose mode
-        if output.is_verbose():
+        if output.get_verbose_level() >= 1:
             output.print_general_message(f"Python version: {sys.version}")
             output.print_general_message(f"Script version: {SCRIPT_VERSION}")
             output.print_general_message(f"Maximum path length: {MAX_PATH_LENGTH}")
@@ -765,23 +789,23 @@ def main() -> None:
         # This ensures graceful termination for long-running operations
         if options.timeout > 0:
             timeout_manager.setup_timeout_handler()
-            if output.is_verbose():
+            if output.get_verbose_level() >= 1:
                 output.print_general_message("Timeout handler configured")
         
         try:
             # PHASE 8: Main filesystem processing
             # This is where the actual work happens - traverse directories and fix ownership
             # All error handling and recovery is managed by the individual components
-            if output.is_verbose():
+            if output.get_verbose_level() >= 1:
                 output.print_general_message("Beginning filesystem processing...")
             
-            process_filesystem(options, owner_sid, stats, output, timeout_manager, security_manager, error_manager)
+            process_filesystem(options, owner_sid, stats, output, timeout_manager, security_manager, error_manager, sid_tracker)
             
         finally:
             # PHASE 9: Cleanup and resource management
             # Always cleanup timeout resources, even if processing was interrupted
             timeout_manager.cancel_timeout()
-            if output.is_verbose():
+            if output.get_verbose_level() >= 1:
                 output.print_general_message("Timeout handler cleaned up")
         
         # PHASE 10: Completion notification and final reporting
@@ -792,8 +816,13 @@ def main() -> None:
         # This provides comprehensive information about what was processed
         stats.print_report(quiet=options.quiet)
         
+        # Generate SID tracking report if enabled
+        # This provides detailed ownership analysis and SID distribution
+        if sid_tracker and not options.quiet:
+            sid_tracker.generate_report(output)
+        
         # Log successful completion in verbose mode
-        if output.is_verbose():
+        if output.get_verbose_level() >= 1:
             output.print_general_message("Script execution completed successfully")
         
     except KeyboardInterrupt:
@@ -805,7 +834,7 @@ def main() -> None:
         print(f"Critical error: {e}", file=sys.stderr)
         
         # In verbose mode, provide additional debugging information
-        if 'output' in locals() and output.is_verbose():
+        if 'output' in locals() and output.get_verbose_level() >= 1:
             import traceback
             print("Stack trace:", file=sys.stderr)
             traceback.print_exc()

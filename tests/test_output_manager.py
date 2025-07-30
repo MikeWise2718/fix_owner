@@ -18,11 +18,11 @@ def test_quiet_mode():
     error_buffer = io.StringIO()
     
     # Create quiet output manager
-    output_mgr = OutputManager(quiet=True, output_stream=output_buffer, error_stream=error_buffer)
+    output_mgr = OutputManager(verbose_level=0, quiet=True, output_stream=output_buffer, error_stream=error_buffer)
     
     # Try various output methods
-    output_mgr.print_examining_path("/test/path", True)
-    output_mgr.print_ownership_change("/test/path", True, False)
+    output_mgr.print_examining_path("/test/path", True, "DOMAIN\\User", True)
+    output_mgr.print_ownership_change("/test/path", True, False, "Administrator")
     output_mgr.print_statistics_header()
     output_mgr.print_statistic("Test stat", 42)
     output_mgr.print_duration_statistic(10.5)
@@ -48,25 +48,30 @@ def test_verbose_mode():
     output_buffer = io.StringIO()
     error_buffer = io.StringIO()
     
-    # Create verbose output manager
-    output_mgr = OutputManager(verbose=True, output_stream=output_buffer, error_stream=error_buffer)
+    # Create verbose output manager (level 3 for detailed examination)
+    output_mgr = OutputManager(verbose_level=3, output_stream=output_buffer, error_stream=error_buffer)
     
-    # Test verbose output methods
-    output_mgr.print_examining_path("/test/dir", True)
-    output_mgr.print_examining_path("/test/file.txt", False)
-    output_mgr.print_ownership_change("/test/dir", True, False)
-    output_mgr.print_ownership_change("/test/file.txt", False, True)
+    # Test verbose output methods (level 3 shows detailed examination)
+    output_mgr.print_examining_path("/test/dir", True, "DOMAIN\\User", True)
+    output_mgr.print_examining_path("/test/file.txt", False, "ORPHANED_SID", False)
+    output_mgr.print_ownership_change("/test/dir", True, False, "Administrator")
+    output_mgr.print_ownership_change("/test/file.txt", False, True, "Administrator")
     output_mgr.print_error("/test/path", Exception("test error"), True)
     
-    # Check output content
+    # Check output content (level 3 shows detailed file/directory examination)
     output_content = output_buffer.getvalue()
-    assert "Examining directory: /test/dir" in output_content
-    assert "Examining file: /test/file.txt" in output_content
-    assert "Changed owner for directory: /test/dir" in output_content
-    assert "Would change owner for file: /test/file.txt" in output_content
+    # Remove ANSI color codes for easier testing
+    import re
+    clean_output = re.sub(r'\x1b\[[0-9;]*m', '', output_content)
+    
+    assert "DIR  /test/dir" in clean_output
+    assert "FILE /test/file.txt" in clean_output
+    assert "VALID" in clean_output
+    assert "ORPHANED" in clean_output
+    assert "CHANGED" in clean_output or "WOULD CHANGE" in clean_output
     
     error_content = error_buffer.getvalue()
-    assert "Error processing directory /test/path: test error" in error_content
+    assert "ERROR processing directory" in error_content and "/test/path" in error_content
     
     print("✓ Verbose mode test passed")
 
@@ -79,12 +84,12 @@ def test_normal_mode():
     output_buffer = io.StringIO()
     error_buffer = io.StringIO()
     
-    # Create normal output manager
-    output_mgr = OutputManager(verbose=False, quiet=False, output_stream=output_buffer, error_stream=error_buffer)
+    # Create normal output manager (level 0 - statistics only)
+    output_mgr = OutputManager(verbose_level=0, quiet=False, output_stream=output_buffer, error_stream=error_buffer)
     
-    # Test that verbose methods don't produce output
-    output_mgr.print_examining_path("/test/path", True)
-    output_mgr.print_ownership_change("/test/path", True, False)
+    # Test that verbose methods don't produce output (level 0 only shows statistics)
+    output_mgr.print_examining_path("/test/path", True, "DOMAIN\\User", True)
+    output_mgr.print_ownership_change("/test/path", True, False, "Administrator")
     output_mgr.print_error("/test/path", Exception("test error"), True)
     
     # Test that statistics methods do produce output
@@ -114,7 +119,7 @@ def test_stats_reporter():
     output_buffer = io.StringIO()
     
     # Create output manager and stats reporter
-    output_mgr = OutputManager(verbose=False, quiet=False, output_stream=output_buffer)
+    output_mgr = OutputManager(verbose_level=0, quiet=False, output_stream=output_buffer)
     stats_reporter = output_mgr.create_stats_reporter()
     
     # Test full report
@@ -149,7 +154,7 @@ def test_quiet_stats_reporter():
     output_buffer = io.StringIO()
     
     # Create quiet output manager and stats reporter
-    output_mgr = OutputManager(quiet=True, output_stream=output_buffer)
+    output_mgr = OutputManager(verbose_level=0, quiet=True, output_stream=output_buffer)
     stats_reporter = output_mgr.create_stats_reporter()
     
     # Test full report in quiet mode

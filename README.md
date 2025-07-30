@@ -17,7 +17,7 @@ A Python utility for recursively taking ownership of directories and files with 
 - **Operating System**: Windows 10/11 or Windows Server
 - **Python**: 3.13 or higher
 - **Privileges**: Administrator privileges required for security operations
-- **Dependencies**: pywin32 for Windows API access
+- **Dependencies**: pywin32 for Windows API access, colorama for colored output
 
 ## Installation
 
@@ -48,7 +48,7 @@ python src/fix_owner.py [OPTIONS] <root_path> [owner_account]
 | `-x, --execute` | Execute changes (default is dry-run mode) |
 | `-r, --recurse` | Recurse into subdirectories |
 | `-f, --files` | Process files in addition to directories |
-| `-v, --verbose` | Show detailed output for each path examined |
+| `-v, --verbose LEVEL` | Verbose output level: 0=statistics only, 1=top-level directory status, 2=directory progress, 3=detailed examination |
 | `-q, --quiet` | Suppress all output including statistics |
 | `-ts, --timeout SECONDS` | Set execution timeout in seconds |
 | `--help` | Show help message and exit |
@@ -78,10 +78,16 @@ python src/fix_owner.py -x C:\ProblemDirectory Administrator
 python src/fix_owner.py -x -r -f C:\ProblemDirectory
 ```
 
-#### 4. Verbose Output
+#### 4. Verbose Output Levels
 ```cmd
-# Show detailed information about each path examined
-python src/fix_owner.py -x -r -v C:\ProblemDirectory
+# Level 1: Show top-level directory status only
+python src/fix_owner.py -x -r -v 1 C:\ProblemDirectory
+
+# Level 2: Show directory progress and summary
+python src/fix_owner.py -x -r -v 2 C:\ProblemDirectory
+
+# Level 3: Show detailed examination of each file/directory
+python src/fix_owner.py -x -r -v 3 C:\ProblemDirectory
 ```
 
 #### 5. With Timeout

@@ -2,12 +2,13 @@
 OutputManager - Centralized output control and verbose logging for the fix-owner script.
 
 This module provides comprehensive output management with support for different
-verbosity levels, consistent formatting, and proper stream handling. It ensures
-that all output throughout the application follows consistent patterns and
+verbosity levels, consistent formatting, colored output, and proper stream handling. 
+It ensures that all output throughout the application follows consistent patterns and
 respects user preferences for verbosity.
 
 Key Features:
-- Multiple output levels (Quiet, Normal, Verbose)
+- Multiple verbose levels (0: statistics only, 1: directory progress, 2: detailed examination)
+- Colored output using colorama for better visual tracking
 - Consistent message formatting across all components
 - Proper stream separation (stdout for normal output, stderr for errors)
 - Integration with statistics reporting
@@ -29,109 +30,261 @@ from typing import Optional, TextIO
 from dataclasses import dataclass
 from enum import Enum
 
+# Import colorama for cross-platform colored output
+try:
+    from colorama import init, Fore, Back, Style
+    init(autoreset=True)  # Automatically reset colors after each print
+    COLORAMA_AVAILABLE = True
+except ImportError:
+    # Fallback if colorama is not available
+    COLORAMA_AVAILABLE = False
+    class _MockColor:
+        def __getattr__(self, name): return ""
+    Fore = Back = Style = _MockColor()
+
 
 class OutputLevel(Enum):
-    """Output verbosity levels."""
-    QUIET = 0      # No output at all
-    NORMAL = 1     # Standard output with final statistics
-    VERBOSE = 2    # Detailed output with path examination info
+    """Output verbosity levels with detailed descriptions."""
+    QUIET = -1     # No output at all (quiet mode)
+    LEVEL_0 = 0    # Only final statistics
+    LEVEL_1 = 1    # Top-level directory status + statistics
+    LEVEL_2 = 2    # Directory progress + statistics
+    LEVEL_3 = 3    # Detailed file/directory examination + all above
 
 
 @dataclass
 class OutputConfig:
     """Configuration for output behavior."""
-    level: OutputLevel = OutputLevel.NORMAL
+    level: OutputLevel = OutputLevel.LEVEL_0
     output_stream: TextIO = sys.stdout
     error_stream: TextIO = sys.stderr
 
 
 class OutputManager:
     """
-    Manages all output for the fix-owner script with support for verbose and quiet modes.
+    Manages all output for the fix-owner script with support for multiple verbose levels and colors.
     
     This class provides centralized output control that handles:
-    - Verbose output showing current paths being examined
-    - Quiet mode that suppresses all output including statistics
+    - Level 0: Only final statistics
+    - Level 1: Directory progress + statistics  
+    - Level 2: Detailed file/directory examination + all above
+    - Quiet mode that suppresses all output
+    - Colored output for better visual tracking
     - Consistent formatting for all messages and statistics
-    - Proper output control throughout all components
     """
     
-    def __init__(self, verbose: bool = False, quiet: bool = False, 
+    def __init__(self, verbose_level: int = 0, quiet: bool = False, 
                  output_stream: TextIO = sys.stdout, error_stream: TextIO = sys.stderr):
         """
-        Initialize OutputManager with specified output behavior.
+        Initialize OutputManager with specified verbose level.
         
         Args:
-            verbose: Enable verbose output showing detailed processing info
-            quiet: Enable quiet mode suppressing all output including statistics
+            verbose_level: Verbosity level (0=stats only, 1=directory progress, 2=detailed)
+            quiet: Enable quiet mode suppressing all output
             output_stream: Stream for normal output (default: stdout)
             error_stream: Stream for error output (default: stderr)
         """
-        # Quiet mode takes precedence over verbose
+        # Quiet mode takes precedence over verbose levels
         if quiet:
             self.level = OutputLevel.QUIET
-        elif verbose:
-            self.level = OutputLevel.VERBOSE
+        elif verbose_level >= 3:
+            self.level = OutputLevel.LEVEL_3
+        elif verbose_level >= 2:
+            self.level = OutputLevel.LEVEL_2
+        elif verbose_level >= 1:
+            self.level = OutputLevel.LEVEL_1
         else:
-            self.level = OutputLevel.NORMAL
+            self.level = OutputLevel.LEVEL_0
             
         self.config = OutputConfig(
             level=self.level,
             output_stream=output_stream,
             error_stream=error_stream
         )
+        
+        # Track directory processing for level 1 output
+        self.current_directory = None
+        self.dirs_needing_change = 0
+        self.files_needing_change = 0
     
     def is_quiet(self) -> bool:
         """Check if quiet mode is enabled."""
         return self.config.level == OutputLevel.QUIET
     
-    def is_verbose(self) -> bool:
-        """Check if verbose mode is enabled."""
-        return self.config.level == OutputLevel.VERBOSE
+    def is_level_0(self) -> bool:
+        """Check if level 0 (statistics only) is enabled."""
+        return self.config.level == OutputLevel.LEVEL_0
     
-    def is_normal(self) -> bool:
-        """Check if normal output mode is enabled."""
-        return self.config.level == OutputLevel.NORMAL
+    def is_level_1(self) -> bool:
+        """Check if level 1 (directory progress) is enabled."""
+        return self.config.level == OutputLevel.LEVEL_1
     
-    def print_examining_path(self, path: str, is_directory: bool = True) -> None:
+    def is_level_2(self) -> bool:
+        """Check if level 2 (directory progress) is enabled."""
+        return self.config.level == OutputLevel.LEVEL_2
+    
+    def is_level_3(self) -> bool:
+        """Check if level 3 (detailed examination) is enabled."""
+        return self.config.level == OutputLevel.LEVEL_3
+    
+    def get_verbose_level(self) -> int:
+        """Get current verbose level as integer."""
+        if self.config.level == OutputLevel.QUIET:
+            return -1
+        elif self.config.level == OutputLevel.LEVEL_0:
+            return 0
+        elif self.config.level == OutputLevel.LEVEL_1:
+            return 1
+        elif self.config.level == OutputLevel.LEVEL_2:
+            return 2
+        elif self.config.level == OutputLevel.LEVEL_3:
+            return 3
+        return 0
+    
+    def print_entering_directory(self, path: str, is_root: bool = False) -> None:
         """
-        Print path examination message in verbose mode.
+        Print message when entering a new directory.
+        Level 1: Only root directory
+        Level 2+: All directories
+        
+        Args:
+            path: Directory path being entered
+            is_root: True if this is the root directory being processed
+        """
+        # Reset counters for new directory
+        self.current_directory = path
+        self.dirs_needing_change = 0
+        self.files_needing_change = 0
+        
+        # Level 1: Only show root directory
+        if self.config.level == OutputLevel.LEVEL_1 and is_root:
+            color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{color}→ Processing root directory: {path}")
+        # Level 2+: Show all directories
+        elif self.config.level.value >= OutputLevel.LEVEL_2.value:
+            color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{color}→ Entering directory: {path}")
+    
+    def print_directory_summary(self, path: str, is_root: bool = False) -> None:
+        """
+        Print summary when finishing a directory.
+        Level 1: Only root directory
+        Level 2+: All directories
+        
+        Args:
+            path: Directory path that was processed
+            is_root: True if this is the root directory being processed
+        """
+        color = Fore.GREEN if COLORAMA_AVAILABLE else ""
+        total_changes = self.dirs_needing_change + self.files_needing_change
+        
+        # Level 1: Only show root directory summary
+        if self.config.level == OutputLevel.LEVEL_1 and is_root:
+            if total_changes > 0:
+                self._write_output(f"{color}✓ Root directory completed: {total_changes} ownership changes needed "
+                                 f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+            else:
+                self._write_output(f"{color}✓ Root directory completed: No ownership changes needed")
+        # Level 2+: Show all directory summaries
+        elif self.config.level.value >= OutputLevel.LEVEL_2.value:
+            if total_changes > 0:
+                self._write_output(f"{color}✓ Completed {path}: {total_changes} ownership changes needed "
+                                 f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+            else:
+                self._write_output(f"{color}✓ Completed {path}: No ownership changes needed")
+    
+    def print_examining_path(self, path: str, is_directory: bool = True, 
+                           current_owner: str = None, is_valid_owner: bool = True) -> None:
+        """
+        Print path examination message.
+        Level 2: Basic directory/file processing
+        Level 3: Detailed examination with ownership info
         
         Args:
             path: Path being examined
             is_directory: True if path is a directory, False if file
+            current_owner: Current owner of the path
+            is_valid_owner: True if current owner is valid, False if orphaned
         """
-        if self.config.level == OutputLevel.VERBOSE:
-            path_type = "directory" if is_directory else "file"
-            self._write_output(f"Examining {path_type}: {path}")
+        if self.config.level.value >= OutputLevel.LEVEL_2.value:
+            path_type = "DIR " if is_directory else "FILE"
+            
+            # Choose colors based on ownership status
+            if is_valid_owner:
+                path_color = Fore.GREEN if COLORAMA_AVAILABLE else ""
+                owner_color = Fore.BLUE if COLORAMA_AVAILABLE else ""
+                status = "VALID"
+            else:
+                path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+                owner_color = Fore.RED if COLORAMA_AVAILABLE else ""
+                status = "ORPHANED"
+                
+                # Track items needing change
+                if is_directory:
+                    self.dirs_needing_change += 1
+                else:
+                    self.files_needing_change += 1
+            
+            # Level 3: Show detailed examination with ownership info
+            if self.config.level == OutputLevel.LEVEL_3:
+                owner_display = current_owner if current_owner else "UNKNOWN"
+                self._write_output(f"  {path_color}{path_type} {path} {owner_color}[{owner_display}] {status}")
+            # Level 2: Show basic processing progress
+            elif self.config.level == OutputLevel.LEVEL_2:
+                if is_directory:
+                    self._write_output(f"  {path_color}Processing directory: {path}")
+                # Only show files if they need changes or in detailed mode
+                elif not is_valid_owner:
+                    self._write_output(f"  {path_color}Processing file: {path} {owner_color}[ORPHANED]")
     
     def print_ownership_change(self, path: str, is_directory: bool = True, 
-                             dry_run: bool = False) -> None:
+                             dry_run: bool = False, new_owner: str = None) -> None:
         """
-        Print ownership change message in verbose mode.
+        Print ownership change message (Level 1+).
         
         Args:
             path: Path where ownership was changed
             is_directory: True if path is a directory, False if file
             dry_run: True if this is a dry run (no actual changes made)
+            new_owner: New owner account name
         """
-        if self.config.level == OutputLevel.VERBOSE:
+        if self.config.level.value >= OutputLevel.LEVEL_2.value:
             path_type = "directory" if is_directory else "file"
-            action = "Would change" if dry_run else "Changed"
-            self._write_output(f"{action} owner for {path_type}: {path}")
+            
+            if dry_run:
+                action_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+                action = "WOULD CHANGE"
+            else:
+                action_color = Fore.GREEN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+                action = "CHANGED"
+            
+            path_color = Fore.CYAN if COLORAMA_AVAILABLE else ""
+            owner_color = Fore.BLUE if COLORAMA_AVAILABLE else ""
+            
+            owner_text = f" → {new_owner}" if new_owner else ""
+            
+            if self.config.level == OutputLevel.LEVEL_3:
+                # Detailed output for level 3
+                self._write_output(f"    {action_color}{action} {path_color}{path_type}: {path}{owner_color}{owner_text}")
+            else:
+                # Compact output for level 2
+                self._write_output(f"  {action_color}{action} {path_type}: {path_color}{path}{owner_color}{owner_text}")
     
     def print_error(self, path: str, error: Exception, is_directory: bool = True) -> None:
         """
-        Print error message in verbose mode.
+        Print error message (Level 1+).
         
         Args:
             path: Path where error occurred
             error: Exception that occurred
             is_directory: True if path is a directory, False if file
         """
-        if self.config.level == OutputLevel.VERBOSE:
+        if self.config.level.value >= OutputLevel.LEVEL_1.value:
             path_type = "directory" if is_directory else "file"
-            self._write_error(f"Error processing {path_type} {path}: {error}")
+            error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+            
+            self._write_error(f"{error_color}ERROR processing {path_type} {path_color}{path}: {error}")
     
     def print_timeout_warning(self, elapsed_time: float, timeout_seconds: int) -> None:
         """
@@ -192,7 +345,7 @@ class OutputManager:
             recurse: Whether recursion is enabled
             include_files: Whether files are included
         """
-        if self.config.level == OutputLevel.VERBOSE:
+        if self.config.level == OutputLevel.LEVEL_3:
             self._write_output(f"Starting ownership fix operation:")
             self._write_output(f"  Root path: {root_path}")
             self._write_output(f"  Target owner: {owner_account}")

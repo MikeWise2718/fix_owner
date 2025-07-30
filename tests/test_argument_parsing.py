@@ -42,7 +42,7 @@ class TestArgumentParsing(unittest.TestCase):
             self.assertFalse(args.execute)
             self.assertFalse(args.recurse)
             self.assertFalse(args.files)
-            self.assertFalse(args.verbose)
+            self.assertEqual(args.verbose, 0)
             self.assertFalse(args.quiet)
             self.assertEqual(args.timeout, 0)
     
@@ -50,7 +50,7 @@ class TestArgumentParsing(unittest.TestCase):
         """Test parsing with all arguments specified."""
         test_args = [
             self.test_dir, 'Administrator',
-            '-x', '-r', '-f', '-v', '-ts', '300'
+            '-x', '-r', '-f', '-v', '3', '-ts', '300'
         ]
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
@@ -61,7 +61,7 @@ class TestArgumentParsing(unittest.TestCase):
             self.assertTrue(args.execute)
             self.assertTrue(args.recurse)
             self.assertTrue(args.files)
-            self.assertTrue(args.verbose)
+            self.assertEqual(args.verbose, 3)
             self.assertFalse(args.quiet)
             self.assertEqual(args.timeout, 300)
     
@@ -69,7 +69,7 @@ class TestArgumentParsing(unittest.TestCase):
         """Test parsing with long-form arguments."""
         test_args = [
             self.test_dir, 'TestUser',
-            '--execute', '--recurse', '--files', '--verbose', '--timeout', '600'
+            '--execute', '--recurse', '--files', '--verbose', '1', '--timeout', '600'
         ]
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
@@ -80,7 +80,7 @@ class TestArgumentParsing(unittest.TestCase):
             self.assertTrue(args.execute)
             self.assertTrue(args.recurse)
             self.assertTrue(args.files)
-            self.assertTrue(args.verbose)
+            self.assertEqual(args.verbose, 1)
             self.assertEqual(args.timeout, 600)
     
     def test_quiet_mode(self):
@@ -91,11 +91,11 @@ class TestArgumentParsing(unittest.TestCase):
             args = parse_arguments()
             
             self.assertTrue(args.quiet)
-            self.assertFalse(args.verbose)
+            self.assertEqual(args.verbose, 0)
     
     def test_verbose_and_quiet_conflict(self):
         """Test that verbose and quiet options conflict."""
-        test_args = [self.test_dir, '-v', '-q']
+        test_args = [self.test_dir, '-v', '1', '-q']
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
             with self.assertRaises(SystemExit):
@@ -215,14 +215,14 @@ class TestArgumentParsing(unittest.TestCase):
             self.assertFalse(args.execute)
             self.assertFalse(args.recurse)
             self.assertFalse(args.files)
-            self.assertFalse(args.verbose)
+            self.assertEqual(args.verbose, 0)
             self.assertFalse(args.quiet)
     
     def test_mixed_short_and_long_options(self):
         """Test mixing short and long option forms."""
         test_args = [
             self.test_dir, 'TestUser',
-            '-x', '--recurse', '-f', '--verbose', '--timeout', '180'
+            '-x', '--recurse', '-f', '--verbose', '1', '--timeout', '180'
         ]
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
@@ -231,7 +231,7 @@ class TestArgumentParsing(unittest.TestCase):
             self.assertTrue(args.execute)
             self.assertTrue(args.recurse)
             self.assertTrue(args.files)
-            self.assertTrue(args.verbose)
+            self.assertEqual(args.verbose, 1)
             self.assertEqual(args.timeout, 180)
 
 

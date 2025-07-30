@@ -237,7 +237,7 @@ class TestIntegrationWorkflow(unittest.TestCase):
         
         # Mock output manager
         self.mock_output_manager.is_quiet.return_value = False
-        self.mock_output_manager.is_verbose.return_value = False
+        self.mock_output_manager.get_verbose_level.return_value = 0
         
         # Mock error manager
         self.mock_error_manager.validate_administrator_privileges.return_value = True
@@ -620,7 +620,7 @@ class TestPerformanceIntegration(unittest.TestCase):
         
         # Mock output manager to be quiet for performance
         self.mock_output_manager.is_quiet.return_value = True
-        self.mock_output_manager.is_verbose.return_value = False
+        self.mock_output_manager.get_verbose_level.return_value = 0
         
         # Mock error manager with fast context
         mock_context = Mock()

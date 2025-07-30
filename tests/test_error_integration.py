@@ -87,7 +87,7 @@ def test_end_to_end_error_handling():
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create real components
         stats = StatsTracker()
-        output = OutputManager(verbose=True, quiet=False)
+        output = OutputManager(verbose_level=1, quiet=False)
         error_manager = ErrorManager(stats_tracker=stats, output_manager=output)
         
         # Create SecurityManager with error handling
@@ -115,7 +115,7 @@ def test_privilege_validation_integration():
     print("Testing privilege validation integration...")
     
     # Create output manager
-    output = OutputManager(verbose=False, quiet=False)
+    output = OutputManager(verbose_level=0, quiet=False)
     error_manager = ErrorManager(output_manager=output)
     
     # Test privilege validation (will likely return False in test environment)
@@ -142,6 +142,7 @@ def test_error_categorization_integration():
     mock_output = Mock()
     mock_output.print_error = Mock()
     mock_output.print_general_error = Mock()
+    mock_output.get_verbose_level = Mock(return_value=1)
     
     error_manager = ErrorManager(stats_tracker=mock_stats, output_manager=mock_output)
     

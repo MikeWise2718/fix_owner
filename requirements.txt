@@ -4,6 +4,9 @@
 # Windows API access for security operations
 pywin32==306
 
+# Cross-platform colored terminal text
+colorama==0.4.6
+
 # Development and testing dependencies (optional)
 # Uncomment if needed for development
 # pytest==7.4.3

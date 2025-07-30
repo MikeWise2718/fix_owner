@@ -239,7 +239,7 @@ class ErrorManager:
             self.output_manager.print_general_error(f"Critical error: {error_info.message}")
         
         # Print stack trace for critical errors in verbose mode
-        if self.output_manager and self.output_manager.is_verbose():
+        if self.output_manager and self.output_manager.get_verbose_level() > 0:
             traceback.print_exc()
         
         sys.exit(1)

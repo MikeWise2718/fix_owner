@@ -37,7 +37,7 @@ class FileSystemWalker:
     handling that continues processing after errors.
     """
     
-    def __init__(self, security_manager, stats_tracker, error_manager=None):
+    def __init__(self, security_manager, stats_tracker, error_manager=None, sid_tracker=None):
         """
         Initialize FileSystemWalker with required dependencies.
         
@@ -45,10 +45,12 @@ class FileSystemWalker:
             security_manager: SecurityManager instance for ownership operations
             stats_tracker: StatsTracker instance for counting operations
             error_manager: Optional ErrorManager for comprehensive error handling
+            sid_tracker: Optional SidTracker for SID analysis and reporting
         """
         self.security_manager = security_manager
         self.stats_tracker = stats_tracker
         self.error_manager = error_manager
+        self.sid_tracker = sid_tracker
     
     def walk_filesystem(self, root_path: str, owner_sid: object, 
                        recurse: bool = False, process_files: bool = False,
@@ -223,6 +225,11 @@ class FileSystemWalker:
         # This returns both the human-readable name (if valid) and the SID object
         owner_name, current_owner_sid = self.security_manager.get_current_owner(dir_path)
         
+        # SID TRACKING: Record SID occurrence if tracking is enabled
+        # This tracks all SIDs encountered, not just orphaned ones
+        if self.sid_tracker:
+            self.sid_tracker.track_directory_sid(dir_path, current_owner_sid)
+        
         # STEP 2: SID VALIDATION
         # Check if current owner SID is invalid/orphaned
         # Invalid SIDs are exactly what we're looking for - they indicate
@@ -316,6 +323,11 @@ class FileSystemWalker:
         # Get current owner information using SecurityManager
         # This returns both the human-readable name (if valid) and the SID object
         owner_name, current_owner_sid = self.security_manager.get_current_owner(file_path)
+        
+        # SID TRACKING: Record SID occurrence if tracking is enabled
+        # This tracks all SIDs encountered, not just orphaned ones
+        if self.sid_tracker:
+            self.sid_tracker.track_file_sid(file_path, current_owner_sid)
         
         # STEP 2: SID VALIDATION
         # Check if current owner SID is invalid/orphaned

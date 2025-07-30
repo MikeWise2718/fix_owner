@@ -138,6 +138,47 @@ The integration tests validate all requirements from the specification:
 8. **Requirement 8** - Command-line interface validation
 9. **Requirement 9** - Python module dependencies
 
+### Pytest Code Coverage
+
+When using pytest with coverage reporting, you can generate detailed coverage reports:
+
+```cmd
+# Run tests with coverage reporting
+pytest tests/ --cov=src --cov-report=html --cov-report=term
+
+# Generate detailed HTML coverage report
+pytest tests/ --cov=src --cov-report=html --cov-report=term-missing
+
+# Run tests with coverage and generate XML report (for CI/CD)
+pytest tests/ --cov=src --cov-report=xml --cov-report=term
+```
+
+#### Coverage Report Output
+After running pytest with coverage, you'll see:
+
+1. **Terminal Output**: Shows coverage percentage and missing lines
+   ```
+   Name                          Stmts   Miss  Cover   Missing
+   -----------------------------------------------------------
+   src/__init__.py                   2      0   100%
+   src/error_manager.py            118     10    92%   
+   src/filesystem_walker.py        80     12    85%   
+   src/fix_owner.py                267    103    61%   
+   src/output_manager.py           190     69    64%   
+   src/sid_tracker.py              117     11    91%   
+   src/timeout_manager.py           51      0   100%
+   -----------------------------------------------------------
+   TOTAL                           825    205    75%
+   ```
+
+2. **HTML Report**: Detailed interactive report in `htmlcov/index.html`
+   - Open `htmlcov/index.html` in your browser
+   - Click on individual files to see line-by-line coverage
+   - Red lines indicate uncovered code
+   - Green lines indicate covered code
+
+3. **XML Report**: Machine-readable report in `coverage.xml` for CI/CD integration
+
 ### Command-Line Option Testing
 All command-line options are tested in various combinations:
 - `-x` (execute mode) vs dry-run mode
