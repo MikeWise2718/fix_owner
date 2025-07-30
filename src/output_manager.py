@@ -66,8 +66,9 @@ class OutputManager:
     
     This class provides centralized output control that handles:
     - Level 0: Only final statistics
-    - Level 1: Directory progress + statistics  
-    - Level 2: Detailed file/directory examination + all above
+    - Level 1: Top-level directory status + statistics  
+    - Level 2: Directory progress + statistics
+    - Level 3: Detailed file/directory examination + all above
     - Quiet mode that suppresses all output
     - Colored output for better visual tracking
     - Consistent formatting for all messages and statistics
@@ -141,50 +142,82 @@ class OutputManager:
             return 3
         return 0
     
-    def print_entering_directory(self, path: str, is_root: bool = False) -> None:
+    def print_entering_directory(self, path: str, is_root: bool = False, is_top_level: bool = False, progress: tuple = None) -> None:
         """
         Print message when entering a new directory.
-        Level 1: Only root directory
+        Level 1: Root directory and top-level directories (immediate children of root)
         Level 2+: All directories
         
         Args:
             path: Directory path being entered
             is_root: True if this is the root directory being processed
+            is_top_level: True if this is a top-level directory (immediate child of root)
+            progress: Optional tuple of (current, total) for progress tracking
         """
         # Reset counters for new directory
         self.current_directory = path
         self.dirs_needing_change = 0
         self.files_needing_change = 0
         
-        # Level 1: Only show root directory
-        if self.config.level == OutputLevel.LEVEL_1 and is_root:
+        # Level 1: Show root directory and top-level directories
+        if self.config.level == OutputLevel.LEVEL_1 and (is_root or is_top_level):
             color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            self._write_output(f"{color}→ Processing root directory: {path}")
+            path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+            if is_root:
+                self._write_output(f"{color}→ Processing root directory: {path_color}{path}")
+            else:
+                # Show progress counter for top-level directories if available
+                if progress:
+                    current, total = progress
+                    self._write_output(f"{color}→ Processing top-level directory {current}/{total}: {path_color}{path}")
+                else:
+                    self._write_output(f"{color}→ Processing top-level directory: {path_color}{path}")
         # Level 2+: Show all directories
         elif self.config.level.value >= OutputLevel.LEVEL_2.value:
             color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
             self._write_output(f"{color}→ Entering directory: {path}")
     
-    def print_directory_summary(self, path: str, is_root: bool = False) -> None:
+    def print_directory_summary(self, path: str, is_root: bool = False, is_top_level: bool = False, progress: tuple = None) -> None:
         """
         Print summary when finishing a directory.
-        Level 1: Only root directory
+        Level 1: Root directory and top-level directories (immediate children of root)
         Level 2+: All directories
         
         Args:
             path: Directory path that was processed
             is_root: True if this is the root directory being processed
+            is_top_level: True if this is a top-level directory (immediate child of root)
+            progress: Optional tuple of (current, total) for progress tracking
         """
         color = Fore.GREEN if COLORAMA_AVAILABLE else ""
+        path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
         total_changes = self.dirs_needing_change + self.files_needing_change
         
-        # Level 1: Only show root directory summary
-        if self.config.level == OutputLevel.LEVEL_1 and is_root:
+        # Level 1: Show root directory and top-level directory summaries
+        if self.config.level == OutputLevel.LEVEL_1 and (is_root or is_top_level):
             if total_changes > 0:
-                self._write_output(f"{color}✓ Root directory completed: {total_changes} ownership changes needed "
-                                 f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                if is_root:
+                    self._write_output(f"{color}✓ Root directory completed: {total_changes} ownership changes needed "
+                                     f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                else:
+                    # Show progress counter for top-level directories if available
+                    if progress:
+                        current, total = progress
+                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed: {path_color}{path}{color} - {total_changes} ownership changes needed "
+                                         f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                    else:
+                        self._write_output(f"{color}✓ Top-level directory completed: {path_color}{path}{color} - {total_changes} ownership changes needed "
+                                         f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
             else:
-                self._write_output(f"{color}✓ Root directory completed: No ownership changes needed")
+                if is_root:
+                    self._write_output(f"{color}✓ Root directory completed: No ownership changes needed")
+                else:
+                    # Show progress counter for top-level directories if available
+                    if progress:
+                        current, total = progress
+                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed: {path_color}{path}{color} - No ownership changes needed")
+                    else:
+                        self._write_output(f"{color}✓ Top-level directory completed: {path_color}{path}{color} - No ownership changes needed")
         # Level 2+: Show all directory summaries
         elif self.config.level.value >= OutputLevel.LEVEL_2.value:
             if total_changes > 0:
@@ -197,6 +230,7 @@ class OutputManager:
                            current_owner: str = None, is_valid_owner: bool = True) -> None:
         """
         Print path examination message.
+        Level 1: Only orphaned items that need changes (for tracking)
         Level 2: Basic directory/file processing
         Level 3: Detailed examination with ownership info
         
@@ -206,6 +240,13 @@ class OutputManager:
             current_owner: Current owner of the path
             is_valid_owner: True if current owner is valid, False if orphaned
         """
+        # Track items needing change for directory summaries
+        if not is_valid_owner:
+            if is_directory:
+                self.dirs_needing_change += 1
+            else:
+                self.files_needing_change += 1
+        
         if self.config.level.value >= OutputLevel.LEVEL_2.value:
             path_type = "DIR " if is_directory else "FILE"
             
@@ -218,12 +259,6 @@ class OutputManager:
                 path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
                 owner_color = Fore.RED if COLORAMA_AVAILABLE else ""
                 status = "ORPHANED"
-                
-                # Track items needing change
-                if is_directory:
-                    self.dirs_needing_change += 1
-                else:
-                    self.files_needing_change += 1
             
             # Level 3: Show detailed examination with ownership info
             if self.config.level == OutputLevel.LEVEL_3:

@@ -91,6 +91,22 @@ class FileSystemWalker:
             timeout_manager: Optional TimeoutManager for execution time limit checking
         """
         try:
+            # PROGRESS TRACKING: Count total top-level directories for progress display
+            # This is only needed for verbosity level 1 to show "Processing top-level directory X/Y"
+            top_level_dirs_total = 0
+            top_level_dirs_current = 0
+            
+            if output_manager and output_manager.is_level_1() and recurse:
+                # Count top-level directories by examining immediate children of root
+                try:
+                    for item in os.listdir(root_path):
+                        item_path = os.path.join(root_path, item)
+                        if os.path.isdir(item_path):
+                            top_level_dirs_total += 1
+                except (OSError, PermissionError):
+                    # If we can't list the directory, we'll just proceed without progress counters
+                    top_level_dirs_total = 0
+            
             # Use os.walk() for efficient directory traversal
             # os.walk() yields (dirpath, dirnames, filenames) tuples for each directory
             # This approach is memory-efficient as it processes one directory at a time
@@ -107,6 +123,28 @@ class FileSystemWalker:
                         )
                     # Break from the main loop to terminate processing gracefully
                     break
+                
+                # DIRECTORY ENTRY: Announce entering directory for level 1+ verbosity
+                # Level 1 shows root and top-level directories, level 2+ shows all directories
+                is_root_dir = (dirpath == root_path)
+                is_top_level_dir = self._is_top_level_directory(dirpath, root_path)
+                
+                # PROGRESS TRACKING: Update counter for top-level directories
+                if is_top_level_dir and top_level_dirs_total > 0:
+                    top_level_dirs_current += 1
+                
+                if output_manager:
+                    # Pass progress information for top-level directories
+                    progress_info = None
+                    if is_top_level_dir and top_level_dirs_total > 0:
+                        progress_info = (top_level_dirs_current, top_level_dirs_total)
+                    
+                    output_manager.print_entering_directory(
+                        dirpath, 
+                        is_root=is_root_dir, 
+                        is_top_level=is_top_level_dir,
+                        progress=progress_info
+                    )
                 
                 # DIRECTORY PROCESSING: Handle ownership for the current directory
                 # This processes the directory itself, not its contents
@@ -133,6 +171,21 @@ class FileSystemWalker:
                         # Construct full file path and process ownership
                         file_path = os.path.join(dirpath, filename)
                         self._process_file(file_path, owner_sid, execute, output_manager)
+                
+                # DIRECTORY SUMMARY: Show completion status for level 1+ verbosity
+                # Level 1 shows root and top-level directories, level 2+ shows all directories
+                if output_manager:
+                    # Pass progress information for top-level directories
+                    progress_info = None
+                    if is_top_level_dir and top_level_dirs_total > 0:
+                        progress_info = (top_level_dirs_current, top_level_dirs_total)
+                    
+                    output_manager.print_directory_summary(
+                        dirpath, 
+                        is_root=is_root_dir, 
+                        is_top_level=is_top_level_dir,
+                        progress=progress_info
+                    )
                 
                 # RECURSION CONTROL: Manage subdirectory traversal
                 # os.walk() uses the dirnames list to determine which subdirectories to enter
@@ -354,3 +407,28 @@ class FileSystemWalker:
                     is_directory=False,
                     dry_run=not execute  # Indicate whether this was a simulation
                 )
+    
+    def _is_top_level_directory(self, dir_path: str, root_path: str) -> bool:
+        """
+        Determine if a directory is a top-level directory (immediate child of root).
+        
+        Args:
+            dir_path: Directory path to check
+            root_path: Root directory path
+            
+        Returns:
+            True if dir_path is an immediate child of root_path, False otherwise
+        """
+        # Normalize paths to handle different path separators
+        normalized_root = os.path.normpath(root_path)
+        normalized_dir = os.path.normpath(dir_path)
+        
+        # If it's the root directory itself, it's not a top-level directory
+        if normalized_dir == normalized_root:
+            return False
+        
+        # Get the parent directory of the current directory
+        parent_dir = os.path.dirname(normalized_dir)
+        
+        # If the parent is the root, then this is a top-level directory
+        return parent_dir == normalized_root
