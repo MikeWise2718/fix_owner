@@ -230,8 +230,7 @@ class ErrorManager:
     def _handle_privilege_error(self, error_info: ErrorInfo) -> None:
         """Handle privilege-related errors."""
         if self.output_manager:
-            self.output_manager.print_privilege_warning()
-            self.output_manager.print_general_error(f"Privilege error: {error_info.message}")
+            self.output_manager.print_warning("Warning: Administrator privileges required for ownership changes - Limited functionality without proper privileges")
     
     def _handle_critical_error(self, error_info: ErrorInfo) -> None:
         """Handle critical errors that should terminate execution."""

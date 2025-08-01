@@ -105,8 +105,11 @@ def test_normal_mode():
     
     # Should contain statistics
     assert "--- Ownership Change Statistics ---" in output_content
-    assert "Test stat: 42" in output_content
-    assert "Total duration: 10.5 seconds" in output_content
+    # Remove ANSI color codes for easier testing
+    import re
+    clean_output = re.sub(r'\x1b\[[0-9;]*m', '', output_content)
+    assert "Test stat: 42" in clean_output
+    assert "Total duration: 10.5 seconds" in clean_output
     
     print("✓ Normal mode test passed")
 
@@ -136,12 +139,15 @@ def test_stats_reporter():
     
     # Check all statistics are present
     assert "--- Ownership Change Statistics ---" in output_content
-    assert "Directories traversed: 100" in output_content
-    assert "Files traversed: 500" in output_content
-    assert "Directory ownerships changed: 10" in output_content
-    assert "File ownerships changed: 25" in output_content
-    assert "Exceptions encountered: 2" in output_content
-    assert "Total duration: 45.7 seconds" in output_content
+    # Remove ANSI color codes for easier testing
+    import re
+    clean_output = re.sub(r'\x1b\[[0-9;]*m', '', output_content)
+    assert "Directories traversed: 100" in clean_output
+    assert "Files traversed: 500" in clean_output
+    assert "Directory ownerships changed: 10" in clean_output
+    assert "File ownerships changed: 25" in clean_output
+    assert "Exceptions encountered: 2" in clean_output
+    assert "Total duration: 45.7 seconds" in clean_output
     
     print("✓ StatsReporter test passed")
 

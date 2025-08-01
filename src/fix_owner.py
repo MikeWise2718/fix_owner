@@ -150,7 +150,17 @@ try:
     PYWIN32_AVAILABLE = True
 except ImportError:
     PYWIN32_AVAILABLE = False
-    print("Error: pywin32 module is required. Install with: pip install pywin32")
+    # Import colorama for colored error output
+    try:
+        from colorama import init, Fore, Style
+        init(autoreset=True)
+        error_color = Fore.RED + Style.BRIGHT
+        reset_color = Style.RESET_ALL
+    except ImportError:
+        error_color = ""
+        reset_color = ""
+    
+    print(f"{error_color}Error: pywin32 module is required. Install with: pip install pywin32{reset_color}", file=sys.stderr)
     sys.exit(EXIT_ERROR)
 
 # Import our custom components
@@ -448,12 +458,13 @@ class StatsTracker:
         """
         return time.time() - self.start_time
     
-    def print_report(self, quiet: bool = False) -> None:
+    def print_report(self, quiet: bool = False, is_simulation: bool = False) -> None:
         """
         Print a formatted statistics report.
         
         Args:
             quiet: If True, suppress all output including statistics
+            is_simulation: If True, show "SIMULATED EXECUTION STATISTICS" header
         """
         if quiet:
             return
@@ -461,7 +472,10 @@ class StatsTracker:
         elapsed_time = self.get_elapsed_time()
         
         print("\n" + "=" * 50)
-        print("EXECUTION STATISTICS")
+        if is_simulation:
+            print("SIMULATED EXECUTION STATISTICS")
+        else:
+            print("EXECUTION STATISTICS")
         print("=" * 50)
         print(f"Directories traversed: {self.dirs_traversed:,}")
         print(f"Files traversed: {self.files_traversed:,}")
@@ -587,7 +601,7 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
         sid, resolved_name = security_manager.resolve_owner_account(account_name)
         
         # Inform user of the resolved account name (includes domain if applicable)
-        output.print_general_message(f"Target owner account: {resolved_name}")
+        output.print_info_pair("Target owner account", resolved_name)
         
         # Log additional account information in verbose mode
         if output.get_verbose_level() >= 1:
@@ -650,11 +664,11 @@ def process_filesystem(options: ExecutionOptions, owner_sid: object,
     # Log the start of filesystem processing in verbose mode
     if output.get_verbose_level() >= 1:
         mode = "EXECUTE" if options.execute else "DRY RUN"
-        output.print_general_message(f"Starting filesystem processing in {mode} mode")
-        output.print_general_message(f"Processing {'files and directories' if options.files else 'directories only'}")
-        output.print_general_message(f"Recursion: {'enabled' if options.recurse else 'disabled'}")
+        output.print_info_pair("Processing mode", mode)
+        output.print_info_pair("Processing scope", 'files and directories' if options.files else 'directories only')
+        output.print_info_pair("Recursion", 'enabled' if options.recurse else 'disabled')
         if options.timeout > 0:
-            output.print_general_message(f"Timeout: {options.timeout} seconds")
+            output.print_info_pair("Timeout", f"{options.timeout} seconds")
     
     # Delegate filesystem processing to the FileSystemWalker
     # This is where the actual traversal and ownership changes occur
@@ -744,9 +758,7 @@ def main() -> None:
         # PHASE 3: Security validation and privilege checking
         # Validate that we have Administrator privileges required for ownership changes
         # This prevents runtime failures and provides clear error messages
-        if not error_manager.validate_administrator_privileges():
-            # Continue with warning - some operations may still work
-            output.print_general_message("Warning: Limited functionality without Administrator privileges")
+        error_manager.validate_administrator_privileges()
         
         # PHASE 4: Execution mode notification and user feedback
         # Clearly indicate whether this is a dry run or will make actual changes
@@ -757,8 +769,6 @@ def main() -> None:
                 output.print_general_message("Changes will be applied to filesystem")
         else:
             output.print_dry_run_notice()
-            if output.get_verbose_level() >= 1:
-                output.print_general_message("No changes will be made - this is a simulation")
         
         # PHASE 5: Target owner account resolution and validation
         # Resolve the target owner account to a SID and validate it exists
@@ -776,11 +786,11 @@ def main() -> None:
         
         # Log additional configuration details in verbose mode
         if output.get_verbose_level() >= 1:
-            output.print_general_message(f"Python version: {sys.version}")
-            output.print_general_message(f"Script version: {SCRIPT_VERSION}")
-            output.print_general_message(f"Maximum path length: {MAX_PATH_LENGTH}")
+            output.print_info_pair("Python version", sys.version)
+            output.print_info_pair("Script version", SCRIPT_VERSION)
+            output.print_info_pair("Maximum path length", str(MAX_PATH_LENGTH))
             if options.timeout > 0:
-                output.print_general_message(f"Execution will timeout after {options.timeout} seconds")
+                output.print_info_pair("Execution timeout", f"{options.timeout} seconds")
         
         # PHASE 7: Timeout configuration and setup
         # Initialize timeout manager for handling execution time limits
@@ -815,7 +825,7 @@ def main() -> None:
         
         # Generate and display final statistics report
         # This provides comprehensive information about what was processed
-        stats.print_report(quiet=options.quiet)
+        stats.print_report(quiet=options.quiet, is_simulation=not options.execute)
         
         # Generate SID tracking report if enabled
         # This provides detailed ownership analysis and SID distribution
@@ -828,11 +838,27 @@ def main() -> None:
         
     except KeyboardInterrupt:
         # Handle user interruption (Ctrl+C) gracefully
-        print("\nOperation cancelled by user", file=sys.stderr)
+        try:
+            from colorama import Fore, Style
+            warning_color = Fore.YELLOW + Style.BRIGHT
+            reset_color = Style.RESET_ALL
+        except ImportError:
+            warning_color = ""
+            reset_color = ""
+        
+        print(f"{warning_color}\nOperation cancelled by user{reset_color}", file=sys.stderr)
         sys.exit(EXIT_INTERRUPTED)
     except Exception as e:
         # Handle any unexpected critical errors
-        print(f"Critical error: {e}", file=sys.stderr)
+        try:
+            from colorama import Fore, Style
+            error_color = Fore.RED + Style.BRIGHT
+            reset_color = Style.RESET_ALL
+        except ImportError:
+            error_color = ""
+            reset_color = ""
+        
+        print(f"{error_color}Critical error: {e}{reset_color}", file=sys.stderr)
         
         # In verbose mode, provide additional debugging information
         if 'output' in locals() and output.get_verbose_level() >= 1:

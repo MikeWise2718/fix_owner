@@ -358,7 +358,7 @@ class OutputManager:
             value: Numeric value of the statistic
         """
         if self.config.level != OutputLevel.QUIET:
-            self._write_output(f"{label}: {value}")
+            self.print_info_pair(label, str(value))
     
     def print_duration_statistic(self, duration_seconds: float) -> None:
         """
@@ -368,12 +368,14 @@ class OutputManager:
             duration_seconds: Total execution time in seconds
         """
         if self.config.level != OutputLevel.QUIET:
-            self._write_output(f"Total duration: {duration_seconds:.1f} seconds")
+            self.print_info_pair("Total duration", f"{duration_seconds:.1f} seconds")
     
     def print_dry_run_notice(self) -> None:
         """Print notice that this is a dry run."""
         if self.config.level != OutputLevel.QUIET:
-            self._write_output("DRY RUN MODE: No actual changes will be made")
+            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{warning_color}Warning: DRY RUN MODE - No changes will be made as this is a simulation{reset_color}")
     
     def print_execution_mode_notice(self) -> None:
         """Print notice that changes will be applied."""
@@ -393,10 +395,10 @@ class OutputManager:
         """
         if self.config.level == OutputLevel.LEVEL_3:
             self._write_output(f"Starting ownership fix operation:")
-            self._write_output(f"  Root path: {root_path}")
-            self._write_output(f"  Target owner: {owner_account}")
-            self._write_output(f"  Recurse subdirectories: {'Yes' if recurse else 'No'}")
-            self._write_output(f"  Include files: {'Yes' if include_files else 'No'}")
+            self.print_info_pair("  Root path", root_path)
+            self.print_info_pair("  Target owner", owner_account)
+            self.print_info_pair("  Recurse subdirectories", 'Yes' if recurse else 'No')
+            self.print_info_pair("  Include files", 'Yes' if include_files else 'No')
     
     def print_completion_message(self) -> None:
         """Print operation completion message."""
@@ -412,13 +414,17 @@ class OutputManager:
             error: Exception that occurred during validation
         """
         # Always print critical errors, even in quiet mode
-        self._write_error(f"Invalid owner account '{owner_account}': {error}")
+        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+        self._write_error(f"{error_color}Error: Invalid owner account '{owner_account}': {error}{reset_color}")
     
     def print_privilege_warning(self) -> None:
         """Print warning about Administrator privileges requirement."""
         if self.config.level != OutputLevel.QUIET:
-            self._write_output("Warning: This script requires Administrator privileges "
-                             "for ownership changes")
+            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{warning_color}Warning: This script requires Administrator privileges "
+                             f"for ownership changes{reset_color}")
     
     def print_general_message(self, message: str) -> None:
         """
@@ -438,7 +444,47 @@ class OutputManager:
             message: Error message to print
         """
         # Always print general errors, even in quiet mode for critical issues
-        self._write_error(message)
+        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+        self._write_error(f"{error_color}{message}{reset_color}")
+    
+    def print_warning(self, message: str) -> None:
+        """
+        Print warning message in yellow.
+        
+        Args:
+            message: Warning message to print
+        """
+        if self.config.level != OutputLevel.QUIET:
+            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{warning_color}{message}{reset_color}")
+    
+    def print_colored_error(self, message: str) -> None:
+        """
+        Print error message in red.
+        
+        Args:
+            message: Error message to print
+        """
+        # Always print errors, even in quiet mode for critical issues
+        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+        self._write_error(f"{error_color}{message}{reset_color}")
+    
+    def print_info_pair(self, description: str, value: str) -> None:
+        """
+        Print description: value pair with light gray description and white value.
+        
+        Args:
+            description: Description text (will be light gray)
+            value: Value text (will be white)
+        """
+        if self.config.level != OutputLevel.QUIET:
+            desc_color = Fore.LIGHTBLACK_EX if COLORAMA_AVAILABLE else ""  # Light gray
+            value_color = Fore.WHITE + Style.BRIGHT if COLORAMA_AVAILABLE else ""  # Bright white
+            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
+            self._write_output(f"{desc_color}{description}: {value_color}{value}{reset_color}")
     
     def _write_output(self, message: str) -> None:
         """

@@ -112,8 +112,7 @@ def test_administrator_privilege_validation():
     
     # Create mock output manager
     mock_output = Mock()
-    mock_output.print_privilege_warning = Mock()
-    mock_output.print_general_error = Mock()
+    mock_output.print_warning = Mock()
     
     error_manager = ErrorManager(output_manager=mock_output)
     
@@ -121,7 +120,7 @@ def test_administrator_privilege_validation():
     with patch('ctypes.windll.shell32.IsUserAnAdmin', return_value=False):
         result = error_manager.validate_administrator_privileges()
         assert result == False, "Should return False when not admin"
-        mock_output.print_privilege_warning.assert_called()
+        mock_output.print_warning.assert_called_with("Warning: Administrator privileges required for ownership changes - Limited functionality without proper privileges")
     
     # Test with mock that returns True (is admin)
     with patch('ctypes.windll.shell32.IsUserAnAdmin', return_value=True):
