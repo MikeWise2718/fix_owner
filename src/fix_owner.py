@@ -38,7 +38,8 @@ USAGE:
         -f, --files     Process files in addition to directories
         -v, --verbose LEVEL   Verbose output level: 0=statistics only, 1=top-level directory status, 2=directory progress, 3=detailed examination
         -q, --quiet     Suppress all output including statistics
-        -ts SECONDS     Timeout after specified seconds (0 = no timeout)
+        -to SECONDS     Timeout after specified seconds (0 = no timeout)
+        -ts, --track-sids   Enable SID tracking and generate ownership analysis report
 
 EXAMPLES:
     # Basic dry run to see what would be changed (safest first step)
@@ -381,7 +382,7 @@ class ExecutionOptions:
     verbose: bool = False          # -v flag: Verbose output
     quiet: bool = False            # -q flag: Suppress all output
     timeout: int = 0               # -ts value: Timeout in seconds
-    track_sids: bool = False       # --track-sids flag: Enable SID tracking
+    track_sids: bool = False       # -ts/--track-sids flag: Enable SID tracking
     root_path: str = ""            # Positional argument: Root path to process
     owner_account: str = ""        # Target owner account
 
@@ -530,14 +531,14 @@ def parse_arguments() -> argparse.Namespace:
         help='Suppress all output including statistics'
     )
     parser.add_argument(
-        '-ts', '--timeout',
+        '-to', '--timeout',
         type=int,
         default=0,
         metavar='SECONDS',
         help='Terminate execution after specified seconds (0 = no timeout)'
     )
     parser.add_argument(
-        '--track-sids',
+        '-ts', '--track-sids',
         action='store_true',
         help='Enable SID tracking and generate ownership analysis report'
     )

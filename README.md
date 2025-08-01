@@ -50,7 +50,7 @@ python src/fix_owner.py [OPTIONS] <root_path> [owner_account]
 | `-f, --files` | Process files in addition to directories |
 | `-v, --verbose LEVEL` | Verbose output level: 0=statistics only, 1=top-level directory status, 2=directory progress, 3=detailed examination |
 | `-q, --quiet` | Suppress all output including statistics |
-| `-ts, --timeout SECONDS` | Set execution timeout in seconds |
+| `-to, --timeout SECONDS` | Set execution timeout in seconds |
 | `--help` | Show help message and exit |
 
 ### Parameters
@@ -93,7 +93,7 @@ python src/fix_owner.py -x -r -v 3 C:\ProblemDirectory
 #### 5. With Timeout
 ```cmd
 # Limit execution to 300 seconds (5 minutes)
-python src/fix_owner.py -x -r -ts 300 C:\ProblemDirectory
+python src/fix_owner.py -x -r -to 300 C:\ProblemDirectory
 ```
 
 #### 6. Quiet Mode
@@ -225,7 +225,7 @@ pytest tests/ --cov=src --cov-report=html
 
 #### Performance Issues
 - **Cause**: Large directory structures
-- **Solution**: Use `-ts` timeout option, process in smaller batches
+- **Solution**: Use `-to` timeout option, process in smaller batches
 
 ### Debug Mode
 For additional debugging information, you can modify the script to enable debug output or use the verbose mode (`-v`) to see detailed processing information.

@@ -538,7 +538,7 @@ class TestCommandLineIntegration(unittest.TestCase):
             ([self.structure['root'], '-q'], {'verbose': False, 'quiet': True}),
             
             # Timeout option
-            ([self.structure['root'], '-ts', '30'], {'timeout': 30}),
+            ([self.structure['root'], '-to', '30'], {'timeout': 30}),
             ([self.structure['root'], '--timeout', '60'], {'timeout': 60}),
             
             # With owner account
@@ -570,7 +570,7 @@ class TestCommandLineIntegration(unittest.TestCase):
             [self.structure['root'], '-v', '-q'],
             
             # Invalid timeout values
-            [self.structure['root'], '-ts', '-1'],
+            [self.structure['root'], '-to', '-1'],
             [self.structure['root'], '--timeout', 'invalid'],
             
             # Non-existent path

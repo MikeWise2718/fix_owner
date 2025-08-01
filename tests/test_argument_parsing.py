@@ -50,7 +50,7 @@ class TestArgumentParsing(unittest.TestCase):
         """Test parsing with all arguments specified."""
         test_args = [
             self.test_dir, 'Administrator',
-            '-x', '-r', '-f', '-v', '3', '-ts', '300'
+            '-x', '-r', '-f', '-v', '3', '-to', '300'
         ]
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
@@ -103,7 +103,7 @@ class TestArgumentParsing(unittest.TestCase):
     
     def test_negative_timeout(self):
         """Test that negative timeout values are rejected."""
-        test_args = [self.test_dir, '-ts', '-10']
+        test_args = [self.test_dir, '-to', '-10']
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
             with self.assertRaises(SystemExit):
@@ -128,7 +128,7 @@ class TestArgumentParsing(unittest.TestCase):
     
     def test_zero_timeout(self):
         """Test that zero timeout is valid (no timeout)."""
-        test_args = [self.test_dir, '-ts', '0']
+        test_args = [self.test_dir, '-to', '0']
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
             args = parse_arguments()
@@ -154,7 +154,7 @@ class TestArgumentParsing(unittest.TestCase):
     
     def test_timeout_with_string_value(self):
         """Test timeout parsing with string values."""
-        test_args = [self.test_dir, '-ts', '120']
+        test_args = [self.test_dir, '-to', '120']
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
             args = parse_arguments()
@@ -163,7 +163,7 @@ class TestArgumentParsing(unittest.TestCase):
     
     def test_invalid_timeout_value(self):
         """Test that invalid timeout values are rejected."""
-        test_args = [self.test_dir, '-ts', 'invalid']
+        test_args = [self.test_dir, '-to', 'invalid']
         
         with patch('sys.argv', ['fix_owner.py'] + test_args):
             with self.assertRaises(SystemExit):

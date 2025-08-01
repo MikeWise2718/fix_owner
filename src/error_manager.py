@@ -340,7 +340,7 @@ class ErrorManager:
                 "Ensure your account has the necessary privileges"
             ],
             ErrorCategory.TIMEOUT: [
-                "Increase the timeout value using -ts option",
+                "Increase the timeout value using -to option",
                 "Process smaller directory structures",
                 "Check system performance and available resources"
             ]

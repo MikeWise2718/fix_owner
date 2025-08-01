@@ -107,6 +107,8 @@ class OutputManager:
         self.current_directory = None
         self.dirs_needing_change = 0
         self.files_needing_change = 0
+        self.total_dirs_processed = 0
+        self.total_files_processed = 0
     
     def is_quiet(self) -> bool:
         """Check if quiet mode is enabled."""
@@ -158,6 +160,8 @@ class OutputManager:
         self.current_directory = path
         self.dirs_needing_change = 0
         self.files_needing_change = 0
+        self.total_dirs_processed = 0
+        self.total_files_processed = 0
         
         # Level 1: Show root directory and top-level directories
         if self.config.level == OutputLevel.LEVEL_1 and (is_root or is_top_level):
@@ -198,33 +202,37 @@ class OutputManager:
             if total_changes > 0:
                 if is_root:
                     self._write_output(f"{color}✓ Root directory completed: {total_changes} ownership changes needed "
-                                     f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                                     f"({self.dirs_needing_change}/{self.total_dirs_processed} dirs, {self.files_needing_change}/{self.total_files_processed} files)")
                 else:
                     # Show progress counter for top-level directories if available
                     if progress:
                         current, total = progress
-                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed: {path_color}{path}{color} - {total_changes} ownership changes needed "
-                                         f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed - {total_changes} ownership changes needed "
+                                         f"({self.dirs_needing_change}/{self.total_dirs_processed} dirs, {self.files_needing_change}/{self.total_files_processed} files)")
                     else:
-                        self._write_output(f"{color}✓ Top-level directory completed: {path_color}{path}{color} - {total_changes} ownership changes needed "
-                                         f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                        self._write_output(f"{color}✓ Top-level directory completed - {total_changes} ownership changes needed "
+                                         f"({self.dirs_needing_change}/{self.total_dirs_processed} dirs, {self.files_needing_change}/{self.total_files_processed} files)")
             else:
                 if is_root:
-                    self._write_output(f"{color}✓ Root directory completed: No ownership changes needed")
+                    self._write_output(f"{color}✓ Root directory completed: No ownership changes needed "
+                                     f"({self.total_dirs_processed} dirs, {self.total_files_processed} files processed)")
                 else:
                     # Show progress counter for top-level directories if available
                     if progress:
                         current, total = progress
-                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed: {path_color}{path}{color} - No ownership changes needed")
+                        self._write_output(f"{color}✓ Top-level directory {current}/{total} completed - No ownership changes needed "
+                                         f"({self.total_dirs_processed} dirs, {self.total_files_processed} files processed)")
                     else:
-                        self._write_output(f"{color}✓ Top-level directory completed: {path_color}{path}{color} - No ownership changes needed")
+                        self._write_output(f"{color}✓ Top-level directory completed - No ownership changes needed "
+                                         f"({self.total_dirs_processed} dirs, {self.total_files_processed} files processed)")
         # Level 2+: Show all directory summaries
         elif self.config.level.value >= OutputLevel.LEVEL_2.value:
             if total_changes > 0:
                 self._write_output(f"{color}✓ Completed {path}: {total_changes} ownership changes needed "
-                                 f"({self.dirs_needing_change} dirs, {self.files_needing_change} files)")
+                                 f"({self.dirs_needing_change}/{self.total_dirs_processed} dirs, {self.files_needing_change}/{self.total_files_processed} files)")
             else:
-                self._write_output(f"{color}✓ Completed {path}: No ownership changes needed")
+                self._write_output(f"{color}✓ Completed {path}: No ownership changes needed "
+                                 f"({self.total_dirs_processed} dirs, {self.total_files_processed} files processed)")
     
     def print_examining_path(self, path: str, is_directory: bool = True, 
                            current_owner: str = None, is_valid_owner: bool = True) -> None:
@@ -240,11 +248,14 @@ class OutputManager:
             current_owner: Current owner of the path
             is_valid_owner: True if current owner is valid, False if orphaned
         """
-        # Track items needing change for directory summaries
-        if not is_valid_owner:
-            if is_directory:
+        # Track items for directory summaries
+        if is_directory:
+            self.total_dirs_processed += 1
+            if not is_valid_owner:
                 self.dirs_needing_change += 1
-            else:
+        else:
+            self.total_files_processed += 1
+            if not is_valid_owner:
                 self.files_needing_change += 1
         
         if self.config.level.value >= OutputLevel.LEVEL_2.value:

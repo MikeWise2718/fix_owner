@@ -134,7 +134,7 @@ The integration tests validate all requirements from the specification:
 4. **Requirement 4** - Comprehensive error handling
 5. **Requirement 5** - Detailed statistics reporting
 6. **Requirement 6** - Output control options (-v, -q)
-7. **Requirement 7** - Execution time limits (-ts option)
+7. **Requirement 7** - Execution time limits (-to option)
 8. **Requirement 8** - Command-line interface validation
 9. **Requirement 9** - Python module dependencies
 
@@ -185,7 +185,7 @@ All command-line options are tested in various combinations:
 - `-r` (recurse) vs single-level processing
 - `-f` (files) vs directories-only processing
 - `-v` (verbose) vs normal vs `-q` (quiet) output
-- `-ts` (timeout) with various timeout values
+- `-to` (timeout) with various timeout values
 - Owner account specifications
 
 ### Error Scenario Testing

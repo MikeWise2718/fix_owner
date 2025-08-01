@@ -233,8 +233,7 @@ class FileSystemWalker:
         
         # VERBOSE OUTPUT: Show current directory being examined
         # This helps users track progress in verbose mode
-        if output_manager:
-            output_manager.print_examining_path(dir_path, is_directory=True)
+        # Note: We'll call this after SID validation to provide accurate ownership status
         
         # ERROR HANDLING: Use ErrorManager context if available for comprehensive handling
         # The context manager ensures exceptions are properly categorized and handled
@@ -287,7 +286,16 @@ class FileSystemWalker:
         # Check if current owner SID is invalid/orphaned
         # Invalid SIDs are exactly what we're looking for - they indicate
         # ownership by accounts that no longer exist (deleted users, etc.)
-        if not self.security_manager.is_sid_valid(current_owner_sid):
+        is_valid_owner = self.security_manager.is_sid_valid(current_owner_sid)
+        
+        # VERBOSE OUTPUT: Show current directory being examined with ownership status
+        # This helps users track progress in verbose mode and shows accurate ownership info
+        if output_manager:
+            output_manager.print_examining_path(dir_path, is_directory=True, 
+                                              current_owner=owner_name, 
+                                              is_valid_owner=is_valid_owner)
+        
+        if not is_valid_owner:
             
             # STEP 3: OWNERSHIP CHANGE (if needed)
             # Only change ownership if we're in execute mode
@@ -332,8 +340,7 @@ class FileSystemWalker:
         
         # VERBOSE OUTPUT: Show current file being examined
         # This helps users track progress in verbose mode, especially for file-heavy directories
-        if output_manager:
-            output_manager.print_examining_path(file_path, is_directory=False)
+        # Note: We'll call this after SID validation to provide accurate ownership status
         
         # ERROR HANDLING: Use ErrorManager context if available for comprehensive handling
         # The context manager ensures exceptions are properly categorized and handled
@@ -386,7 +393,16 @@ class FileSystemWalker:
         # Check if current owner SID is invalid/orphaned
         # Invalid SIDs are exactly what we're looking for - they indicate
         # ownership by accounts that no longer exist (deleted users, etc.)
-        if not self.security_manager.is_sid_valid(current_owner_sid):
+        is_valid_owner = self.security_manager.is_sid_valid(current_owner_sid)
+        
+        # VERBOSE OUTPUT: Show current file being examined with ownership status
+        # This helps users track progress in verbose mode and shows accurate ownership info
+        if output_manager:
+            output_manager.print_examining_path(file_path, is_directory=False, 
+                                              current_owner=owner_name, 
+                                              is_valid_owner=is_valid_owner)
+        
+        if not is_valid_owner:
             
             # STEP 3: OWNERSHIP CHANGE (if needed)
             # Only change ownership if we're in execute mode

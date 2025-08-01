@@ -187,9 +187,9 @@ class SidTracker:
     
     def _print_report_header(self, output_manager=None) -> None:
         """Print report header section."""
-        header = "\n" + "=" * 70
+        header = "\n" + "=" * 110
         title = "SID OWNERSHIP ANALYSIS REPORT"
-        header_lines = [header, title.center(70), "=" * 70]
+        header_lines = [header, title.center(110), "=" * 110]
         
         for line in header_lines:
             if output_manager:
@@ -219,9 +219,9 @@ class SidTracker:
         # Table header
         table_header = [
             "SID DETAILS:",
-            "-" * 70,
-            f"{'Account Name':<35} {'Files':<8} {'Dirs':<8} {'Status':<10}",
-            "-" * 70
+            "-" * 110,
+            f"{'Files':<8} {'Dirs':<8} {'Status':<10} {'Account Name'}",
+            "-" * 110
         ]
         
         for line in table_header:
@@ -251,11 +251,8 @@ class SidTracker:
             else:
                 status = "Unknown"
             
-            # Truncate long account names for table formatting
-            if len(account_name) > 34:
-                account_name = account_name[:31] + "..."
-            
-            line = f"{account_name:<35} {file_count:<8} {dir_count:<8} {status:<10}"
+            # Account name is now last and never truncated
+            line = f"{file_count:<8} {dir_count:<8} {status:<10} {account_name}"
             
             if output_manager:
                 output_manager.print_general_message(line)
@@ -265,14 +262,14 @@ class SidTracker:
     def _print_report_footer(self, output_manager=None) -> None:
         """Print report footer section."""
         footer_lines = [
-            "-" * 70,
+            "-" * 110,
             "Legend:",
             "  Files: Number of files owned by this SID",
             "  Dirs:  Number of directories owned by this SID", 
             "  Valid: SID corresponds to an existing account",
             "  Orphaned: SID does not correspond to any existing account",
             "  Unknown: SID validation could not be performed",
-            "=" * 70
+            "=" * 110
         ]
         
         for line in footer_lines:

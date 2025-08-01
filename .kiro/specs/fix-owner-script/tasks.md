@@ -18,7 +18,7 @@
 
 
   - Create parse_arguments() function using argparse module
-  - Define all command-line options (-x, -r, -f, -v, -q, -ts) with proper help text
+  - Define all command-line options (-x, -r, -f, -v, -q, -to) with proper help text
   - Add positional argument for root path and optional owner account parameter
   - Implement argument validation and error handling for invalid combinations
   - _Requirements: 8.1, 8.2, 8.3_
@@ -67,7 +67,7 @@
 
 
 
-  - Create TimeoutManager class to handle -ts timeout option
+  - Create TimeoutManager class to handle -to timeout option
   - Implement timeout checking mechanism that can interrupt processing
   - Add graceful termination when timeout is reached
   - Integrate timeout checking into the main processing loop

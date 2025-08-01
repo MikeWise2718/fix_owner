@@ -76,7 +76,7 @@ This feature involves creating a Python script that recursively takes ownership 
 
 #### Acceptance Criteria
 
-1. WHEN the -ts option is specified with a number THEN the system SHALL terminate execution after that many seconds
+1. WHEN the -to option is specified with a number THEN the system SHALL terminate execution after that many seconds
 2. WHEN the time limit is reached THEN the system SHALL stop processing and display current statistics
 3. WHEN no time limit is specified THEN the system SHALL run until completion
 

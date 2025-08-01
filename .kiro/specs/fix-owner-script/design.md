@@ -141,7 +141,7 @@ class ExecutionOptions:
     files: bool = False            # -f flag
     verbose: bool = False          # -v flag
     quiet: bool = False            # -q flag
-    timeout: int = 0               # -ts value
+    timeout: int = 0               # -to value
     root_path: str = ""            # positional argument
     owner_account: str = ""        # target owner account
 ```
