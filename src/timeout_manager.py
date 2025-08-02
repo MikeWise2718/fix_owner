@@ -43,7 +43,7 @@ class TimeoutManager:
             timeout_seconds: Maximum execution time in seconds. 0 means no timeout.
         """
         self.timeout_seconds = timeout_seconds
-        self.start_time = time.time()
+        self.start_time = self._get_current_time()
         self.timeout_reached = False
         self._timer: Optional[threading.Timer] = None
         
@@ -57,7 +57,7 @@ class TimeoutManager:
         if self.timeout_seconds <= 0:
             return False
             
-        elapsed = time.time() - self.start_time
+        elapsed = self._get_current_time() - self.start_time
         if elapsed >= self.timeout_seconds:
             self.timeout_reached = True
             
@@ -70,7 +70,7 @@ class TimeoutManager:
         Returns:
             Elapsed time in seconds.
         """
-        return time.time() - self.start_time
+        return self._get_current_time() - self.start_time
     
     def get_remaining_time(self) -> float:
         """
@@ -121,7 +121,7 @@ class TimeoutManager:
         """
         Reset the timeout timer to start counting from now.
         """
-        self.start_time = time.time()
+        self.start_time = self._get_current_time()
         self.timeout_reached = False
         if self._timer:
             self._timer.cancel()
@@ -142,3 +142,7 @@ class TimeoutManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - cleanup timer."""
         self.cancel_timeout()
+    
+    def _get_current_time(self) -> float:
+        """Get current timestamp - can be overridden for testing."""
+        return time.time()

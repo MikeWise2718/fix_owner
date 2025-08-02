@@ -19,14 +19,18 @@ Classes:
 
 from typing import Optional
 
-# Windows security imports
+# Import common utilities and constants
 try:
+    from .common import PYWIN32_AVAILABLE
+except ImportError:
+    # Fall back to absolute imports (when run as a script)
+    from common import PYWIN32_AVAILABLE
+
+# Windows security imports (availability checked in common)
+if PYWIN32_AVAILABLE:
     import win32security
     import win32api
     import win32con
-    PYWIN32_AVAILABLE = True
-except ImportError:
-    PYWIN32_AVAILABLE = False
 
 
 class SecurityManager:

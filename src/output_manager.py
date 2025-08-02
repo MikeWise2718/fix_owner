@@ -30,7 +30,7 @@ from typing import Optional, TextIO
 from dataclasses import dataclass
 from enum import Enum
 
-# Import common color definitions
+# Import common color constants
 try:
     from .common import (
         info_lt_clr, info_dk_clr, section_clr, error_clr, warn_clr, ok_clr, reset_clr,
@@ -166,8 +166,8 @@ class OutputManager:
         
         # Level 1: Show root directory and top-level directories
         if self.config.level == OutputLevel.LEVEL_1 and (is_root or is_top_level):
-            color = f"{info_lt_clr}"  # Using bright white for emphasis
-            path_color = f"{warn_clr}"  # Using yellow for paths
+            color = f"{info_lt_clr}"  # Using info_lt_clr for emphasis
+            path_color = f"{warn_clr}"  # Using warn_clr for paths
             if is_root:
                 self._write_output(f"{color}→ Processing root directory: {path_color}{path}")
             else:
@@ -179,7 +179,7 @@ class OutputManager:
                     self._write_output(f"{color}→ Processing top-level directory: {path_color}{path}")
         # Level 2+: Show all directories
         elif self.config.level.value >= OutputLevel.LEVEL_2.value:
-            color = f"{info_lt_clr}"  # Using bright white for emphasis
+            color = f"{info_lt_clr}"  # Using info_lt_clr for emphasis
             self._write_output(f"{color}→ Entering directory: {path}")
     
     def print_directory_summary(self, path: str, is_root: bool = False, is_top_level: bool = False, progress: tuple = None) -> None:
@@ -194,8 +194,8 @@ class OutputManager:
             is_top_level: True if this is a top-level directory (immediate child of root)
             progress: Optional tuple of (current, total) for progress tracking
         """
-        color = f"{ok_clr}"  # Using green for success
-        path_color = f"{warn_clr}"  # Using yellow for paths
+        color = f"{ok_clr}"  # Using ok_clr for success
+        path_color = f"{warn_clr}"  # Using warn_clr for paths
         total_changes = self.dirs_needing_change + self.files_needing_change
         
         # Level 1: Show root directory and top-level directory summaries
@@ -262,14 +262,14 @@ class OutputManager:
         if self.config.level.value >= OutputLevel.LEVEL_2.value:
             path_type = "DIR " if is_directory else "FILE"
             
-            # Choose colors based on ownership status
+            # Choose color constants based on ownership status
             if is_valid_owner:
-                path_color = f"{ok_clr}"  # Using green for valid
-                owner_color = f"{info_lt_clr}"  # Using bright white for owner info
+                path_color = f"{ok_clr}"  # Using ok_clr for valid
+                owner_color = f"{info_lt_clr}"  # Using info_lt_clr for owner info
                 status = "VALID"
             else:
-                path_color = f"{warn_clr}"  # Using yellow for attention
-                owner_color = f"{error_clr}"  # Using red for orphaned
+                path_color = f"{warn_clr}"  # Using warn_clr for attention
+                owner_color = f"{error_clr}"  # Using error_clr for orphaned
                 status = "ORPHANED"
             
             # Level 3: Show detailed examination with ownership info
@@ -299,14 +299,14 @@ class OutputManager:
             path_type = "directory" if is_directory else "file"
             
             if dry_run:
-                action_color = f"{warn_clr}"  # Using yellow for simulation
+                action_color = f"{warn_clr}"  # Using warn_clr for simulation
                 action = "WOULD CHANGE"
             else:
-                action_color = f"{ok_clr}"  # Using green for actual changes
+                action_color = f"{ok_clr}"  # Using ok_clr for actual changes
                 action = "CHANGED"
             
-            path_color = f"{info_lt_clr}"  # Using bright white for paths
-            owner_color = f"{info_lt_clr}"  # Using bright white for owner info
+            path_color = f"{info_lt_clr}"  # Using info_lt_clr for paths
+            owner_color = f"{info_lt_clr}"  # Using info_lt_clr for owner info
             
             owner_text = f" → {new_owner}" if new_owner else ""
             
@@ -328,8 +328,8 @@ class OutputManager:
         """
         if self.config.level.value >= OutputLevel.LEVEL_1.value:
             path_type = "directory" if is_directory else "file"
-            error_color = f"{error_clr}"  # Using red for errors
-            path_color = f"{warn_clr}"  # Using yellow for paths
+            error_color = f"{error_clr}"  # Using error_clr for errors
+            path_color = f"{warn_clr}"  # Using warn_clr for paths
             
             self._write_error(f"{error_color}ERROR processing {path_type} {path_color}{path}: {error}")
     

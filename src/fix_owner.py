@@ -130,49 +130,26 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-# Import common color definitions
+# Import common utilities and constants
 try:
-    from .common import section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE
+    from .common import (
+        section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE,
+        SCRIPT_VERSION, MAX_PATH_LENGTH, EXIT_SUCCESS, EXIT_ERROR, EXIT_INTERRUPTED,
+        PYWIN32_AVAILABLE, safe_exit, validate_path_exists, validate_path_is_directory,
+        setup_module_path
+    )
 except ImportError:
     # Fall back to absolute imports (when run as a script)
-    from common import section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE
+    from common import (
+        section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE,
+        SCRIPT_VERSION, MAX_PATH_LENGTH, EXIT_SUCCESS, EXIT_ERROR, EXIT_INTERRUPTED,
+        PYWIN32_AVAILABLE, safe_exit, validate_path_exists, validate_path_is_directory,
+        setup_module_path
+    )
 
-# Module-level constants and configuration
-SCRIPT_VERSION = "1.0.0"
-REQUIRED_PYTHON_VERSION = (3, 13)
-DEFAULT_TIMEOUT_SECONDS = 0  # No timeout by default
-MAX_PATH_LENGTH = 260  # Windows MAX_PATH limitation
-CHUNK_SIZE = 1000  # Process items in chunks for memory efficiency
-
-# Exit codes
-EXIT_SUCCESS = 0
-EXIT_ERROR = 1
-EXIT_INTERRUPTED = 2
-
-# Windows security imports
-try:
-    import win32security
-    import win32api
-    import win32con
-    PYWIN32_AVAILABLE = True
-except ImportError:
-    PYWIN32_AVAILABLE = False
-    # Use common colors if available, otherwise no colors
-    try:
-        # Try to import common colors
-        try:
-            from .common import error_clr, reset_clr
-        except ImportError:
-            from common import error_clr, reset_clr
-        error_color = error_clr
-        reset_color = reset_clr
-    except ImportError:
-        # If common colors not available, no colors
-        error_color = ""
-        reset_color = ""
-    
-    print(f"{error_color}Error: pywin32 module is required. Install with: pip install pywin32{reset_color}", file=sys.stderr)
-    sys.exit(EXIT_ERROR)
+# Check for pywin32 availability (imported from common)
+if not PYWIN32_AVAILABLE:
+    safe_exit(EXIT_ERROR, "Error: pywin32 module is required. Install with: pip install pywin32")
 
 # Import our custom components
 try:
@@ -186,9 +163,7 @@ try:
     from .security_manager import SecurityManager
 except ImportError:
     # Fall back to absolute imports (when run as a script)
-    import sys
-    import os
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    setup_module_path()
     from timeout_manager import TimeoutManager
     from output_manager import OutputManager
     from filesystem_walker import FileSystemWalker
@@ -310,10 +285,10 @@ def parse_arguments() -> argparse.Namespace:
     if args.timeout < 0:
         parser.error("Timeout value must be non-negative")
     
-    if not os.path.exists(args.root_path):
+    if not validate_path_exists(args.root_path):
         parser.error(f"Root path does not exist: {args.root_path}")
     
-    if not os.path.isdir(args.root_path):
+    if not validate_path_is_directory(args.root_path):
         parser.error(f"Root path is not a directory: {args.root_path}")
     
     return args
@@ -370,7 +345,7 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
             output.print_general_message("- Check that you have permission to query the account")
         
         # Exit with error code since we cannot proceed without a valid target account
-        sys.exit(EXIT_ERROR)
+        safe_exit(EXIT_ERROR)
 
 
 
@@ -591,11 +566,10 @@ def main() -> None:
         
     except KeyboardInterrupt:
         # Handle user interruption (Ctrl+C) gracefully
-        print(f"{warn_clr}\nOperation cancelled by user{reset_clr}", file=sys.stderr)
-        sys.exit(EXIT_INTERRUPTED)
+        safe_exit(EXIT_INTERRUPTED, "\nOperation cancelled by user")
     except Exception as e:
         # Handle any unexpected critical errors
-        print(f"{error_clr}Critical error: {e}{reset_clr}", file=sys.stderr)
+        error_message = f"Critical error: {e}"
         
         # In verbose mode, provide additional debugging information
         if 'output' in locals() and output.get_verbose_level() >= 1:
@@ -603,7 +577,7 @@ def main() -> None:
             print("Stack trace:", file=sys.stderr)
             traceback.print_exc()
         
-        sys.exit(EXIT_ERROR)
+        safe_exit(EXIT_ERROR, error_message)
 
 
 if __name__ == "__main__":

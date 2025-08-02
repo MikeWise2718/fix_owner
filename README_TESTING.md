@@ -7,13 +7,14 @@ This document describes the comprehensive testing suite for the fix-owner script
 The testing suite is organized into several layers:
 
 ### 1. Unit Tests
-- **test_security_manager.py** - Tests for Windows security operations
+- **test_security_manager.py** - Tests for Windows security operations and SID management
 - **test_stats_tracker.py** - Tests for statistics tracking and reporting
 - **test_argument_parsing.py** - Tests for command-line argument parsing
 - **test_filesystem_walker.py** - Tests for directory traversal logic
 - **test_timeout_manager.py** - Tests for timeout handling
 - **test_error_manager.py** - Tests for comprehensive error handling
 - **test_output_manager.py** - Tests for output control and verbose logging
+- **test_sid_tracker.py** - Tests for SID tracking and ownership analysis
 
 ### 2. Integration Tests (NEW)
 - **test_integration.py** - Comprehensive integration and end-to-end testing
@@ -101,9 +102,12 @@ This runs only the integration and end-to-end tests.
 
 ### Run Individual Unit Tests
 ```bash
-python test_security_manager.py
-python test_filesystem_walker.py
-python test_error_manager.py
+python tests/test_security_manager.py
+python tests/test_stats_tracker.py
+python tests/test_filesystem_walker.py
+python tests/test_error_manager.py
+python tests/test_output_manager.py
+python tests/test_sid_tracker.py
 # ... etc
 ```
 

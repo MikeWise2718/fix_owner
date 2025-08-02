@@ -21,12 +21,18 @@ Classes:
 import time
 from typing import Optional
 
-# Import common color definitions
+# Import common utilities and constants
 try:
-    from .common import section_clr, reset_clr, COLORAMA_AVAILABLE
+    from .common import (
+        section_clr, reset_clr, COLORAMA_AVAILABLE, SECTION_BAR_WIDTH,
+        get_current_timestamp, format_elapsed_time, print_section_bar
+    )
 except ImportError:
     # Fall back to absolute imports (when run as a script)
-    from common import section_clr, reset_clr, COLORAMA_AVAILABLE
+    from common import (
+        section_clr, reset_clr, COLORAMA_AVAILABLE, SECTION_BAR_WIDTH,
+        get_current_timestamp, format_elapsed_time, print_section_bar
+    )
 
 
 class StatsTracker:
@@ -46,7 +52,7 @@ class StatsTracker:
         self.dirs_changed = 0
         self.files_changed = 0
         self.exceptions = 0
-        self.start_time = time.time()
+        self.start_time = get_current_timestamp()
     
     def increment_dirs_traversed(self) -> None:
         """Increment the count of directories traversed."""
@@ -75,7 +81,7 @@ class StatsTracker:
         Returns:
             Elapsed time in seconds as a float with high precision
         """
-        return time.time() - self.start_time
+        return format_elapsed_time(self.start_time)
     
     def print_report(self, quiet: bool = False, is_simulation: bool = False, output_manager=None) -> None:
         """
@@ -96,15 +102,16 @@ class StatsTracker:
         
         elapsed_time = self.get_elapsed_time()
         
-        # Color the headers and bars as section headers
-        print(f"\n{section_clr}{'=' * 50}{reset_clr}")
+        # Print section header
+        print()  # Add newline
+        print_section_bar(SECTION_BAR_WIDTH)
         if is_simulation:
             print(f"{section_clr}SIMULATED EXECUTION STATISTICS{reset_clr}")
         else:
             print(f"{section_clr}EXECUTION STATISTICS{reset_clr}")
-        print(f"{section_clr}{'=' * 50}{reset_clr}")
+        print_section_bar(SECTION_BAR_WIDTH)
         
-        # Use OutputManager for colored formatting if available
+        # Use OutputManager for formatted output if available
         if output_manager:
             output_manager.print_info_pair("Directories traversed", f"{self.dirs_traversed:,}")
             output_manager.print_info_pair("Files traversed", f"{self.files_traversed:,}")
@@ -113,7 +120,7 @@ class StatsTracker:
             output_manager.print_info_pair("Exceptions encountered", f"{self.exceptions:,}")
             output_manager.print_info_pair("Total execution time", f"{elapsed_time:.2f} seconds")
         else:
-            # Fallback to plain printing without colors
+            # Fallback to plain printing
             print(f"Directories traversed: {self.dirs_traversed:,}")
             print(f"Files traversed: {self.files_traversed:,}")
             print(f"Directory ownerships changed: {self.dirs_changed:,}")
@@ -121,7 +128,7 @@ class StatsTracker:
             print(f"Exceptions encountered: {self.exceptions:,}")
             print(f"Total execution time: {elapsed_time:.2f} seconds")
         
-        print(f"{section_clr}{'=' * 50}{reset_clr}")
+        print_section_bar(SECTION_BAR_WIDTH)
     
     def get_summary_stats(self) -> dict:
         """
@@ -151,7 +158,7 @@ class StatsTracker:
         self.dirs_changed = 0
         self.files_changed = 0
         self.exceptions = 0
-        self.start_time = time.time()
+        self.start_time = get_current_timestamp()
     
     def has_changes(self) -> bool:
         """

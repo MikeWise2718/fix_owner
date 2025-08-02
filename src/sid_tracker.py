@@ -20,23 +20,22 @@ Classes:
 from typing import Dict, Tuple, Optional
 from collections import defaultdict
 
-# Windows security imports
-try:
-    import win32security
-    WIN32SECURITY_AVAILABLE = True
-except ImportError:
-    WIN32SECURITY_AVAILABLE = False
-
-# Import common color definitions
+# Import common utilities and constants
 try:
     from .common import (
-        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE
+        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE,
+        WIN32SECURITY_AVAILABLE, REPORT_BAR_WIDTH
     )
 except ImportError:
     # Fall back to absolute imports (when run as a script)
     from common import (
-        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE
+        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE,
+        WIN32SECURITY_AVAILABLE, REPORT_BAR_WIDTH
     )
+
+# Windows security imports (availability checked in common)
+if WIN32SECURITY_AVAILABLE:
+    import win32security
 
 
 class SidTracker:
@@ -198,10 +197,10 @@ class SidTracker:
     
     def _print_report_header(self, output_manager=None) -> None:
         """Print report header section."""
-        header = f"\n{section_clr}{'=' * 110}{reset_clr}"
+        header = f"\n{section_clr}{'=' * REPORT_BAR_WIDTH}{reset_clr}"
         title_text = "SID OWNERSHIP ANALYSIS REPORT"
-        title = f"{section_clr}{title_text.center(110)}{reset_clr}"
-        bottom_bar = f"{section_clr}{'=' * 110}{reset_clr}"
+        title = f"{section_clr}{title_text.center(REPORT_BAR_WIDTH)}{reset_clr}"
+        bottom_bar = f"{section_clr}{'=' * REPORT_BAR_WIDTH}{reset_clr}"
         
         header_lines = [header, title, bottom_bar]
         
@@ -214,7 +213,7 @@ class SidTracker:
     def _print_summary_statistics(self, output_manager=None) -> None:
         """Print summary statistics section."""
         if output_manager:
-            # Use colored formatting for description: value pairs
+            # Use OutputManager formatting for description: value pairs
             output_manager.print_info_pair("Total files analyzed", f"{self.total_files_tracked:,}")
             output_manager.print_info_pair("Total directories analyzed", f"{self.total_dirs_tracked:,}")
             output_manager.print_info_pair("Unique SIDs found", f"{self.unique_sids_found:,}")
@@ -240,9 +239,9 @@ class SidTracker:
         # Table header
         table_header = [
             "SID DETAILS:",
-            "-" * 110,
+            "-" * REPORT_BAR_WIDTH,
             f"{'Files':<8} {'Dirs':<8} {'Status':<10} {'Account Name'}",
-            "-" * 110
+            "-" * REPORT_BAR_WIDTH
         ]
         
         for line in table_header:
@@ -264,7 +263,7 @@ class SidTracker:
             file_count = data['file_count']
             dir_count = data['dir_count']
             
-            # Determine status with color
+            # Determine status with appropriate color constant
             if data['is_valid'] is True:
                 status = f"{ok_clr}Valid{reset_clr}"
             elif data['is_valid'] is False:
@@ -272,7 +271,7 @@ class SidTracker:
             else:
                 status = f"{warn_clr}Unknown{reset_clr}"
             
-            # Build line with colored status
+            # Build line with status using color constants
             # Note: We need to account for the color codes in the formatting
             line = f"{file_count:<8} {dir_count:<8} {status:<10} {account_name}"
             
@@ -283,20 +282,20 @@ class SidTracker:
     
     def _print_report_footer(self, output_manager=None) -> None:
         """Print report footer section."""
-        # Create colored legend lines
+        # Create legend lines using color constants
         valid_colored = f"{ok_clr}Valid{reset_clr}"
         orphaned_colored = f"{error_clr}Orphaned{reset_clr}"
         unknown_colored = f"{warn_clr}Unknown{reset_clr}"
         
         footer_lines = [
-            "-" * 110,
+            "-" * REPORT_BAR_WIDTH,
             "Legend:",
             "  Files: Number of files owned by this SID",
             "  Dirs:  Number of directories owned by this SID", 
             f"  {valid_colored}: SID corresponds to an existing account",
             f"  {orphaned_colored}: SID does not correspond to any existing account",
             f"  {unknown_colored}: SID validation could not be performed",
-            f"{section_clr}{'=' * 110}{reset_clr}"
+            f"{section_clr}{'=' * REPORT_BAR_WIDTH}{reset_clr}"
         ]
         
         for line in footer_lines:
