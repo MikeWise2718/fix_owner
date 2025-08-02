@@ -27,6 +27,17 @@ try:
 except ImportError:
     WIN32SECURITY_AVAILABLE = False
 
+# Import common color definitions
+try:
+    from .common import (
+        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE
+    )
+except ImportError:
+    # Fall back to absolute imports (when run as a script)
+    from common import (
+        section_clr, error_clr, warn_clr, ok_clr, reset_clr, COLORAMA_AVAILABLE
+    )
+
 
 class SidTracker:
     """
@@ -187,9 +198,12 @@ class SidTracker:
     
     def _print_report_header(self, output_manager=None) -> None:
         """Print report header section."""
-        header = "\n" + "=" * 110
-        title = "SID OWNERSHIP ANALYSIS REPORT"
-        header_lines = [header, title.center(110), "=" * 110]
+        header = f"\n{section_clr}{'=' * 110}{reset_clr}"
+        title_text = "SID OWNERSHIP ANALYSIS REPORT"
+        title = f"{section_clr}{title_text.center(110)}{reset_clr}"
+        bottom_bar = f"{section_clr}{'=' * 110}{reset_clr}"
+        
+        header_lines = [header, title, bottom_bar]
         
         for line in header_lines:
             if output_manager:
@@ -199,19 +213,26 @@ class SidTracker:
     
     def _print_summary_statistics(self, output_manager=None) -> None:
         """Print summary statistics section."""
-        summary_lines = [
-            f"Total files analyzed: {self.total_files_tracked:,}",
-            f"Total directories analyzed: {self.total_dirs_tracked:,}",
-            f"Unique SIDs found: {self.unique_sids_found:,}",
-            f"Valid SIDs: {self.valid_sids_count:,}",
-            f"Orphaned SIDs: {self.orphaned_sids_count:,}",
-            ""
-        ]
-        
-        for line in summary_lines:
-            if output_manager:
-                output_manager.print_general_message(line)
-            else:
+        if output_manager:
+            # Use colored formatting for description: value pairs
+            output_manager.print_info_pair("Total files analyzed", f"{self.total_files_tracked:,}")
+            output_manager.print_info_pair("Total directories analyzed", f"{self.total_dirs_tracked:,}")
+            output_manager.print_info_pair("Unique SIDs found", f"{self.unique_sids_found:,}")
+            output_manager.print_info_pair("Valid SIDs", f"{self.valid_sids_count:,}")
+            output_manager.print_info_pair("Orphaned SIDs", f"{self.orphaned_sids_count:,}")
+            output_manager.print_general_message("")  # Empty line
+        else:
+            # Fallback to plain printing
+            summary_lines = [
+                f"Total files analyzed: {self.total_files_tracked:,}",
+                f"Total directories analyzed: {self.total_dirs_tracked:,}",
+                f"Unique SIDs found: {self.unique_sids_found:,}",
+                f"Valid SIDs: {self.valid_sids_count:,}",
+                f"Orphaned SIDs: {self.orphaned_sids_count:,}",
+                ""
+            ]
+            
+            for line in summary_lines:
                 print(line)
     
     def _print_sid_details_table(self, output_manager=None) -> None:
@@ -243,15 +264,16 @@ class SidTracker:
             file_count = data['file_count']
             dir_count = data['dir_count']
             
-            # Determine status
+            # Determine status with color
             if data['is_valid'] is True:
-                status = "Valid"
+                status = f"{ok_clr}Valid{reset_clr}"
             elif data['is_valid'] is False:
-                status = "Orphaned"
+                status = f"{error_clr}Orphaned{reset_clr}"
             else:
-                status = "Unknown"
+                status = f"{warn_clr}Unknown{reset_clr}"
             
-            # Account name is now last and never truncated
+            # Build line with colored status
+            # Note: We need to account for the color codes in the formatting
             line = f"{file_count:<8} {dir_count:<8} {status:<10} {account_name}"
             
             if output_manager:
@@ -261,15 +283,20 @@ class SidTracker:
     
     def _print_report_footer(self, output_manager=None) -> None:
         """Print report footer section."""
+        # Create colored legend lines
+        valid_colored = f"{ok_clr}Valid{reset_clr}"
+        orphaned_colored = f"{error_clr}Orphaned{reset_clr}"
+        unknown_colored = f"{warn_clr}Unknown{reset_clr}"
+        
         footer_lines = [
             "-" * 110,
             "Legend:",
             "  Files: Number of files owned by this SID",
             "  Dirs:  Number of directories owned by this SID", 
-            "  Valid: SID corresponds to an existing account",
-            "  Orphaned: SID does not correspond to any existing account",
-            "  Unknown: SID validation could not be performed",
-            "=" * 110
+            f"  {valid_colored}: SID corresponds to an existing account",
+            f"  {orphaned_colored}: SID does not correspond to any existing account",
+            f"  {unknown_colored}: SID validation could not be performed",
+            f"{section_clr}{'=' * 110}{reset_clr}"
         ]
         
         for line in footer_lines:

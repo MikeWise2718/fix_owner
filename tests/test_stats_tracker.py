@@ -9,9 +9,9 @@ import time
 import io
 import os
 
-# Import the StatsTracker from src/fix_owner.py
+# Import the StatsTracker from src/stats_tracker.py
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from src.fix_owner import StatsTracker
+from src.stats_tracker import StatsTracker
 
 
 class TestStatsTracker(unittest.TestCase):

@@ -30,17 +30,18 @@ from typing import Optional, TextIO
 from dataclasses import dataclass
 from enum import Enum
 
-# Import colorama for cross-platform colored output
+# Import common color definitions
 try:
-    from colorama import init, Fore, Back, Style
-    init(autoreset=True)  # Automatically reset colors after each print
-    COLORAMA_AVAILABLE = True
+    from .common import (
+        info_lt_clr, info_dk_clr, section_clr, error_clr, warn_clr, ok_clr, reset_clr,
+        COLORAMA_AVAILABLE
+    )
 except ImportError:
-    # Fallback if colorama is not available
-    COLORAMA_AVAILABLE = False
-    class _MockColor:
-        def __getattr__(self, name): return ""
-    Fore = Back = Style = _MockColor()
+    # Fall back to absolute imports (when run as a script)
+    from common import (
+        info_lt_clr, info_dk_clr, section_clr, error_clr, warn_clr, ok_clr, reset_clr,
+        COLORAMA_AVAILABLE
+    )
 
 
 class OutputLevel(Enum):
@@ -165,8 +166,8 @@ class OutputManager:
         
         # Level 1: Show root directory and top-level directories
         if self.config.level == OutputLevel.LEVEL_1 and (is_root or is_top_level):
-            color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+            color = f"{info_lt_clr}"  # Using bright white for emphasis
+            path_color = f"{warn_clr}"  # Using yellow for paths
             if is_root:
                 self._write_output(f"{color}→ Processing root directory: {path_color}{path}")
             else:
@@ -178,7 +179,7 @@ class OutputManager:
                     self._write_output(f"{color}→ Processing top-level directory: {path_color}{path}")
         # Level 2+: Show all directories
         elif self.config.level.value >= OutputLevel.LEVEL_2.value:
-            color = Fore.CYAN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+            color = f"{info_lt_clr}"  # Using bright white for emphasis
             self._write_output(f"{color}→ Entering directory: {path}")
     
     def print_directory_summary(self, path: str, is_root: bool = False, is_top_level: bool = False, progress: tuple = None) -> None:
@@ -193,8 +194,8 @@ class OutputManager:
             is_top_level: True if this is a top-level directory (immediate child of root)
             progress: Optional tuple of (current, total) for progress tracking
         """
-        color = Fore.GREEN if COLORAMA_AVAILABLE else ""
-        path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+        color = f"{ok_clr}"  # Using green for success
+        path_color = f"{warn_clr}"  # Using yellow for paths
         total_changes = self.dirs_needing_change + self.files_needing_change
         
         # Level 1: Show root directory and top-level directory summaries
@@ -263,12 +264,12 @@ class OutputManager:
             
             # Choose colors based on ownership status
             if is_valid_owner:
-                path_color = Fore.GREEN if COLORAMA_AVAILABLE else ""
-                owner_color = Fore.BLUE if COLORAMA_AVAILABLE else ""
+                path_color = f"{ok_clr}"  # Using green for valid
+                owner_color = f"{info_lt_clr}"  # Using bright white for owner info
                 status = "VALID"
             else:
-                path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
-                owner_color = Fore.RED if COLORAMA_AVAILABLE else ""
+                path_color = f"{warn_clr}"  # Using yellow for attention
+                owner_color = f"{error_clr}"  # Using red for orphaned
                 status = "ORPHANED"
             
             # Level 3: Show detailed examination with ownership info
@@ -298,14 +299,14 @@ class OutputManager:
             path_type = "directory" if is_directory else "file"
             
             if dry_run:
-                action_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+                action_color = f"{warn_clr}"  # Using yellow for simulation
                 action = "WOULD CHANGE"
             else:
-                action_color = Fore.GREEN + Style.BRIGHT if COLORAMA_AVAILABLE else ""
+                action_color = f"{ok_clr}"  # Using green for actual changes
                 action = "CHANGED"
             
-            path_color = Fore.CYAN if COLORAMA_AVAILABLE else ""
-            owner_color = Fore.BLUE if COLORAMA_AVAILABLE else ""
+            path_color = f"{info_lt_clr}"  # Using bright white for paths
+            owner_color = f"{info_lt_clr}"  # Using bright white for owner info
             
             owner_text = f" → {new_owner}" if new_owner else ""
             
@@ -327,8 +328,8 @@ class OutputManager:
         """
         if self.config.level.value >= OutputLevel.LEVEL_1.value:
             path_type = "directory" if is_directory else "file"
-            error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            path_color = Fore.YELLOW if COLORAMA_AVAILABLE else ""
+            error_color = f"{error_clr}"  # Using red for errors
+            path_color = f"{warn_clr}"  # Using yellow for paths
             
             self._write_error(f"{error_color}ERROR processing {path_type} {path_color}{path}: {error}")
     
@@ -373,9 +374,7 @@ class OutputManager:
     def print_dry_run_notice(self) -> None:
         """Print notice that this is a dry run."""
         if self.config.level != OutputLevel.QUIET:
-            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-            self._write_output(f"{warning_color}Warning: DRY RUN MODE - No changes will be made as this is a simulation{reset_color}")
+            self._write_output(f"{warn_clr}Warning: DRY RUN MODE - No changes will be made as this is a simulation{reset_clr}")
     
     def print_execution_mode_notice(self) -> None:
         """Print notice that changes will be applied."""
@@ -414,17 +413,13 @@ class OutputManager:
             error: Exception that occurred during validation
         """
         # Always print critical errors, even in quiet mode
-        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-        self._write_error(f"{error_color}Error: Invalid owner account '{owner_account}': {error}{reset_color}")
+        self._write_error(f"{error_clr}Error: Invalid owner account '{owner_account}': {error}{reset_clr}")
     
     def print_privilege_warning(self) -> None:
         """Print warning about Administrator privileges requirement."""
         if self.config.level != OutputLevel.QUIET:
-            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-            self._write_output(f"{warning_color}Warning: This script requires Administrator privileges "
-                             f"for ownership changes{reset_color}")
+            self._write_output(f"{warn_clr}Warning: This script requires Administrator privileges "
+                             f"for ownership changes{reset_clr}")
     
     def print_general_message(self, message: str) -> None:
         """
@@ -444,9 +439,7 @@ class OutputManager:
             message: Error message to print
         """
         # Always print general errors, even in quiet mode for critical issues
-        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-        self._write_error(f"{error_color}{message}{reset_color}")
+        self._write_error(f"{error_clr}{message}{reset_clr}")
     
     def print_warning(self, message: str) -> None:
         """
@@ -456,9 +449,7 @@ class OutputManager:
             message: Warning message to print
         """
         if self.config.level != OutputLevel.QUIET:
-            warning_color = Fore.YELLOW + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-            self._write_output(f"{warning_color}{message}{reset_color}")
+            self._write_output(f"{warn_clr}{message}{reset_clr}")
     
     def print_colored_error(self, message: str) -> None:
         """
@@ -468,9 +459,7 @@ class OutputManager:
             message: Error message to print
         """
         # Always print errors, even in quiet mode for critical issues
-        error_color = Fore.RED + Style.BRIGHT if COLORAMA_AVAILABLE else ""
-        reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-        self._write_error(f"{error_color}{message}{reset_color}")
+        self._write_error(f"{error_clr}{message}{reset_clr}")
     
     def print_info_pair(self, description: str, value: str) -> None:
         """
@@ -481,10 +470,7 @@ class OutputManager:
             value: Value text (will be white)
         """
         if self.config.level != OutputLevel.QUIET:
-            desc_color = Fore.LIGHTBLACK_EX if COLORAMA_AVAILABLE else ""  # Light gray
-            value_color = Fore.WHITE + Style.BRIGHT if COLORAMA_AVAILABLE else ""  # Bright white
-            reset_color = Style.RESET_ALL if COLORAMA_AVAILABLE else ""
-            self._write_output(f"{desc_color}{description}: {value_color}{value}{reset_color}")
+            self._write_output(f"{info_dk_clr}{description}: {info_lt_clr}{value}{reset_clr}")
     
     def _write_output(self, message: str) -> None:
         """

@@ -130,6 +130,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+# Import common color definitions
+try:
+    from .common import section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE
+except ImportError:
+    # Fall back to absolute imports (when run as a script)
+    from common import section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE
+
 # Module-level constants and configuration
 SCRIPT_VERSION = "1.0.0"
 REQUIRED_PYTHON_VERSION = (3, 13)
@@ -150,13 +157,17 @@ try:
     PYWIN32_AVAILABLE = True
 except ImportError:
     PYWIN32_AVAILABLE = False
-    # Import colorama for colored error output
+    # Use common colors if available, otherwise no colors
     try:
-        from colorama import init, Fore, Style
-        init(autoreset=True)
-        error_color = Fore.RED + Style.BRIGHT
-        reset_color = Style.RESET_ALL
+        # Try to import common colors
+        try:
+            from .common import error_clr, reset_clr
+        except ImportError:
+            from common import error_clr, reset_clr
+        error_color = error_clr
+        reset_color = reset_clr
     except ImportError:
+        # If common colors not available, no colors
         error_color = ""
         reset_color = ""
     
@@ -171,6 +182,8 @@ try:
     from .filesystem_walker import FileSystemWalker
     from .error_manager import ErrorManager, ErrorCategory
     from .sid_tracker import SidTracker
+    from .stats_tracker import StatsTracker
+    from .security_manager import SecurityManager
 except ImportError:
     # Fall back to absolute imports (when run as a script)
     import sys
@@ -181,206 +194,10 @@ except ImportError:
     from filesystem_walker import FileSystemWalker
     from error_manager import ErrorManager, ErrorCategory
     from sid_tracker import SidTracker
+    from stats_tracker import StatsTracker
+    from security_manager import SecurityManager
 
 
-class SecurityManager:
-    """
-    Manages Windows security operations for file/directory ownership.
-    
-    This class encapsulates all Windows security API interactions including
-    SID validation, ownership retrieval, and ownership changes.
-    """
-    
-    def __init__(self, error_manager: Optional[ErrorManager] = None):
-        """
-        Initialize the SecurityManager.
-        
-        Args:
-            error_manager: Optional ErrorManager for comprehensive error handling
-        """
-        if not PYWIN32_AVAILABLE:
-            raise ImportError("pywin32 module is required for security operations")
-        self.error_manager = error_manager
-    
-    def get_current_owner(self, path: str) -> tuple[Optional[str], object]:
-        """
-        Get current owner of a file or directory using Windows Security APIs.
-        
-        This method performs a two-step process:
-        1. Retrieves the security descriptor and extracts the owner SID
-        2. Attempts to resolve the SID to a human-readable account name
-        
-        Args:
-            path: Path to examine
-            
-        Returns:
-            Tuple of (owner_name, owner_sid). owner_name is None if SID is invalid/orphaned.
-            
-        Raises:
-            Exception: If unable to get security information
-        """
-        try:
-            # Step 1: Get the security descriptor for the file/directory
-            # OWNER_SECURITY_INFORMATION flag requests only owner information for efficiency
-            sd = win32security.GetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION)
-            
-            # Extract the owner SID from the security descriptor
-            # This SID uniquely identifies the owner account
-            owner_sid = sd.GetSecurityDescriptorOwner()
-            
-            try:
-                # Step 2: Attempt to resolve SID to account name
-                # LookupAccountSid converts SID to human-readable name and domain
-                name, domain, _ = win32security.LookupAccountSid(None, owner_sid)
-                
-                # Format as DOMAIN\USERNAME or just USERNAME if no domain
-                owner_name = f"{domain}\\{name}" if domain else name
-                return owner_name, owner_sid
-                
-            except Exception:
-                # SID resolution failed - this indicates an orphaned/invalid SID
-                # The SID exists but doesn't correspond to any current account
-                # This is exactly what we want to detect and fix
-                return None, owner_sid
-                
-        except Exception as e:
-            # Handle errors in getting security information
-            if self.error_manager:
-                error_info = self.error_manager.handle_exception(
-                    e, path=path, context="Getting current owner"
-                )
-                if error_info.should_terminate:
-                    raise
-            raise Exception(f"Failed to get owner information for '{path}': {e}")
-    
-    def is_sid_valid(self, sid: object) -> bool:
-        """
-        Check if a SID corresponds to a valid account using Windows Security APIs.
-        
-        This method attempts to resolve a SID to an account name. If the resolution
-        succeeds, the SID is valid. If it fails, the SID is orphaned/invalid.
-        
-        Args:
-            sid: SID object to validate
-            
-        Returns:
-            True if SID corresponds to an existing account, False if orphaned/invalid
-        """
-        try:
-            # Attempt to resolve SID to account name
-            # If this succeeds, the SID is valid and corresponds to an existing account
-            win32security.LookupAccountSid(None, sid)
-            return True
-        except Exception:
-            # LookupAccountSid failed - SID is orphaned/invalid
-            # This is the condition we're looking for to identify ownership that needs fixing
-            return False
-    
-    def set_owner(self, path: str, owner_sid: object) -> bool:
-        """
-        Set ownership of a file or directory using Windows Security APIs.
-        
-        This method performs a three-step process to change ownership:
-        1. Retrieves the current security descriptor
-        2. Modifies the owner SID in the security descriptor
-        3. Applies the modified security descriptor back to the file/directory
-        
-        Args:
-            path: Path to change ownership
-            owner_sid: SID of new owner account
-            
-        Returns:
-            True if ownership was successfully changed
-            
-        Raises:
-            Exception: If unable to set ownership due to permissions or other errors
-        """
-        try:
-            # Step 1: Get current security descriptor
-            # We need the existing descriptor to modify only the owner portion
-            sd = win32security.GetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION)
-            
-            # Step 2: Set the new owner SID in the security descriptor
-            # The second parameter (False) indicates we're not setting a group owner
-            sd.SetSecurityDescriptorOwner(owner_sid, False)
-            
-            # Step 3: Apply the modified security descriptor back to the file/directory
-            # This is where the actual ownership change occurs
-            win32security.SetFileSecurity(path, win32security.OWNER_SECURITY_INFORMATION, sd)
-            
-            return True
-            
-        except Exception as e:
-            # Handle ownership change errors through ErrorManager if available
-            if self.error_manager:
-                error_info = self.error_manager.handle_exception(
-                    e, path=path, context="Setting ownership"
-                )
-                if error_info.should_terminate:
-                    raise
-            raise Exception(f"Failed to set owner for '{path}': {e}")
-    
-    def resolve_owner_account(self, account_name: Optional[str]) -> tuple[object, str]:
-        """
-        Convert account name to SID using Windows Security APIs.
-        
-        This method resolves either a specified account name or the current user
-        to a Security Identifier (SID) that can be used for ownership operations.
-        It handles both local and domain accounts properly.
-        
-        Args:
-            account_name: Account name to resolve (e.g., "Administrator", "DOMAIN\\User"), 
-                         or None to use current user
-            
-        Returns:
-            Tuple of (SID object, resolved account name with domain)
-            
-        Raises:
-            Exception: If account cannot be resolved or doesn't exist
-        """
-        try:
-            if account_name:
-                # Use specified account name
-                # LookupAccountName resolves the name to SID and provides domain info
-                sid, domain, account_type = win32security.LookupAccountName(None, account_name)
-                
-                # Format the resolved name with domain for clarity
-                resolved_name = f"{domain}\\{account_name}" if domain else account_name
-                
-                # Log the account type for debugging (User, Group, Domain, etc.)
-                if self.error_manager and hasattr(self.error_manager, 'output_manager'):
-                    output = self.error_manager.output_manager
-                    if output and hasattr(output, 'get_verbose_level') and callable(output.get_verbose_level):
-                        try:
-                            if output.get_verbose_level() >= 1:
-                                account_types = {
-                                    1: "User", 2: "Group", 3: "Domain", 4: "Alias", 
-                                    5: "WellKnownGroup", 6: "DeletedAccount", 7: "Invalid", 8: "Unknown"
-                                }
-                                type_name = account_types.get(account_type, f"Type{account_type}")
-                                output.print_general_message(f"Resolved account type: {type_name}")
-                        except (TypeError, AttributeError):
-                            # Handle mock objects or other issues gracefully
-                            pass
-                        
-            else:
-                # Use current user - get the full username with domain
-                current_user = win32api.GetUserNameEx(win32con.NameSamCompatible)
-                sid, domain, account_type = win32security.LookupAccountName(None, current_user)
-                resolved_name = current_user
-                
-            return sid, resolved_name
-            
-        except Exception as e:
-            # Handle account resolution errors
-            account_display = account_name or "current user"
-            if self.error_manager:
-                error_info = self.error_manager.handle_exception(
-                    e, context=f"Resolving account '{account_display}'", critical=True
-                )
-                if error_info.should_terminate:
-                    raise
-            raise Exception(f"Failed to resolve account '{account_display}': {e}")
 
 
 @dataclass
@@ -411,79 +228,6 @@ class ExecutionStats:
         """Get elapsed time since start."""
         return time.time() - self.start_time
 
-
-class StatsTracker:
-    """
-    Tracks and reports execution statistics for the fix-owner script.
-    
-    This class provides counters for directories, files, changes, and exceptions,
-    along with methods to increment each counter and generate formatted reports.
-    """
-    
-    def __init__(self):
-        """Initialize the StatsTracker with zero counters."""
-        self.dirs_traversed = 0
-        self.files_traversed = 0
-        self.dirs_changed = 0
-        self.files_changed = 0
-        self.exceptions = 0
-        self.start_time = time.time()
-    
-    def increment_dirs_traversed(self) -> None:
-        """Increment the count of directories traversed."""
-        self.dirs_traversed += 1
-    
-    def increment_files_traversed(self) -> None:
-        """Increment the count of files traversed."""
-        self.files_traversed += 1
-    
-    def increment_dirs_changed(self) -> None:
-        """Increment the count of directory ownerships changed."""
-        self.dirs_changed += 1
-    
-    def increment_files_changed(self) -> None:
-        """Increment the count of file ownerships changed."""
-        self.files_changed += 1
-    
-    def increment_exceptions(self) -> None:
-        """Increment the count of exceptions encountered."""
-        self.exceptions += 1
-    
-    def get_elapsed_time(self) -> float:
-        """
-        Get the elapsed time since tracking started.
-        
-        Returns:
-            Elapsed time in seconds as a float
-        """
-        return time.time() - self.start_time
-    
-    def print_report(self, quiet: bool = False, is_simulation: bool = False) -> None:
-        """
-        Print a formatted statistics report.
-        
-        Args:
-            quiet: If True, suppress all output including statistics
-            is_simulation: If True, show "SIMULATED EXECUTION STATISTICS" header
-        """
-        if quiet:
-            return
-        
-        elapsed_time = self.get_elapsed_time()
-        
-        print("\n" + "=" * 50)
-        if is_simulation:
-            print("SIMULATED EXECUTION STATISTICS")
-        else:
-            print("EXECUTION STATISTICS")
-        print("=" * 50)
-        print(f"Directories traversed: {self.dirs_traversed:,}")
-        print(f"Files traversed: {self.files_traversed:,}")
-        print(f"Directory ownerships changed: {self.dirs_changed:,}")
-        print(f"File ownerships changed: {self.files_changed:,}")
-        print(f"Exceptions encountered: {self.exceptions:,}")
-        print(f"Total execution time: {elapsed_time:.2f} seconds")
-        print("=" * 50)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -739,6 +483,11 @@ def main() -> None:
             quiet=args.quiet
         )
         
+        # Print opening information
+        output.print_general_message("fix_owner - a utility to change the owner on sets of Windows 11 files")
+        output.print_info_pair("Script version", SCRIPT_VERSION)
+        output.print_info_pair("Python version", sys.version)
+        
         # Initialize comprehensive error manager with dependencies
         # This provides centralized error handling, categorization, and recovery
         error_manager = ErrorManager(stats_tracker=stats, output_manager=output)
@@ -786,8 +535,6 @@ def main() -> None:
         
         # Log additional configuration details in verbose mode
         if output.get_verbose_level() >= 1:
-            output.print_info_pair("Python version", sys.version)
-            output.print_info_pair("Script version", SCRIPT_VERSION)
             output.print_info_pair("Maximum path length", str(MAX_PATH_LENGTH))
             if options.timeout > 0:
                 output.print_info_pair("Execution timeout", f"{options.timeout} seconds")
@@ -808,9 +555,15 @@ def main() -> None:
             # This is where the actual work happens - traverse directories and fix ownership
             # All error handling and recovery is managed by the individual components
             if output.get_verbose_level() >= 1:
-                output.print_general_message("Beginning filesystem processing...")
+                output.print_general_message(f"\n{section_clr}{'=' * 50}{reset_clr}")
+                output.print_general_message(f"{section_clr}BEGINNING FILESYSTEM PROCESSING{reset_clr}")
+                output.print_general_message(f"{section_clr}{'=' * 50}{reset_clr}")
             
             process_filesystem(options, owner_sid, stats, output, timeout_manager, security_manager, error_manager, sid_tracker)
+            
+            # Print terminating bars after filesystem processing
+            if output.get_verbose_level() >= 1:
+                output.print_general_message(f"{section_clr}{'=' * 50}{reset_clr}")
             
         finally:
             # PHASE 9: Cleanup and resource management
@@ -825,7 +578,7 @@ def main() -> None:
         
         # Generate and display final statistics report
         # This provides comprehensive information about what was processed
-        stats.print_report(quiet=options.quiet, is_simulation=not options.execute)
+        stats.print_report(quiet=options.quiet, is_simulation=not options.execute, output_manager=output)
         
         # Generate SID tracking report if enabled
         # This provides detailed ownership analysis and SID distribution
@@ -838,27 +591,11 @@ def main() -> None:
         
     except KeyboardInterrupt:
         # Handle user interruption (Ctrl+C) gracefully
-        try:
-            from colorama import Fore, Style
-            warning_color = Fore.YELLOW + Style.BRIGHT
-            reset_color = Style.RESET_ALL
-        except ImportError:
-            warning_color = ""
-            reset_color = ""
-        
-        print(f"{warning_color}\nOperation cancelled by user{reset_color}", file=sys.stderr)
+        print(f"{warn_clr}\nOperation cancelled by user{reset_clr}", file=sys.stderr)
         sys.exit(EXIT_INTERRUPTED)
     except Exception as e:
         # Handle any unexpected critical errors
-        try:
-            from colorama import Fore, Style
-            error_color = Fore.RED + Style.BRIGHT
-            reset_color = Style.RESET_ALL
-        except ImportError:
-            error_color = ""
-            reset_color = ""
-        
-        print(f"{error_color}Critical error: {e}{reset_color}", file=sys.stderr)
+        print(f"{error_clr}Critical error: {e}{reset_clr}", file=sys.stderr)
         
         # In verbose mode, provide additional debugging information
         if 'output' in locals() and output.get_verbose_level() >= 1:

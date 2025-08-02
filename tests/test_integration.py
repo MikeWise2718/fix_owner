@@ -27,7 +27,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import main components for integration testing
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from src.fix_owner import main, parse_arguments, SecurityManager, StatsTracker
+from src.fix_owner import main, parse_arguments
+from src.security_manager import SecurityManager
+from src.stats_tracker import StatsTracker
 from src.filesystem_walker import FileSystemWalker
 from src.output_manager import OutputManager
 from src.error_manager import ErrorManager

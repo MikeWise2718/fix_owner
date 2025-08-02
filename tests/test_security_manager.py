@@ -9,9 +9,9 @@ from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
 
-# Import the SecurityManager from src/fix_owner.py
+# Import the SecurityManager from src/security_manager.py
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from src.fix_owner import SecurityManager
+from src.security_manager import SecurityManager
 from src.error_manager import ErrorManager
 
 
@@ -23,7 +23,7 @@ class TestSecurityManager(unittest.TestCase):
         self.mock_error_manager = Mock()
         self.security_manager = SecurityManager(error_manager=self.mock_error_manager)
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_get_current_owner_valid_sid(self, mock_win32security):
         """Test getting current owner with valid SID."""
         # Mock security descriptor and SID
@@ -46,7 +46,7 @@ class TestSecurityManager(unittest.TestCase):
         )
         mock_win32security.LookupAccountSid.assert_called_once_with(None, mock_sid)
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_get_current_owner_invalid_sid(self, mock_win32security):
         """Test getting current owner with invalid/orphaned SID."""
         # Mock security descriptor and SID
@@ -64,7 +64,7 @@ class TestSecurityManager(unittest.TestCase):
         self.assertIsNone(owner_name)
         self.assertEqual(owner_sid, mock_sid)
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_get_current_owner_access_denied(self, mock_win32security):
         """Test getting current owner when access is denied."""
         # Mock GetFileSecurity to raise exception
@@ -76,7 +76,7 @@ class TestSecurityManager(unittest.TestCase):
         
         self.assertIn("Access denied", str(context.exception))
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_is_sid_valid_true(self, mock_win32security):
         """Test SID validation for valid SID."""
         mock_sid = Mock()
@@ -87,7 +87,7 @@ class TestSecurityManager(unittest.TestCase):
         self.assertTrue(result)
         mock_win32security.LookupAccountSid.assert_called_once_with(None, mock_sid)
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_is_sid_valid_false(self, mock_win32security):
         """Test SID validation for invalid SID."""
         mock_sid = Mock()
@@ -97,7 +97,7 @@ class TestSecurityManager(unittest.TestCase):
         
         self.assertFalse(result)
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_set_owner_success(self, mock_win32security):
         """Test setting ownership successfully."""
         # Mock security descriptor
@@ -116,7 +116,7 @@ class TestSecurityManager(unittest.TestCase):
             "/test/path", mock_win32security.OWNER_SECURITY_INFORMATION, mock_sd
         )
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_set_owner_failure(self, mock_win32security):
         """Test setting ownership failure."""
         mock_owner_sid = Mock()
@@ -127,8 +127,8 @@ class TestSecurityManager(unittest.TestCase):
         
         self.assertIn("Access denied", str(context.exception))
     
-    @patch('src.fix_owner.win32api')
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32api')
+    @patch('src.security_manager.win32security')
     def test_resolve_owner_account_specified(self, mock_win32security, mock_win32api):
         """Test resolving specified owner account."""
         mock_sid = Mock()
@@ -140,9 +140,9 @@ class TestSecurityManager(unittest.TestCase):
         self.assertEqual(resolved_name, "DOMAIN\\TestUser")
         mock_win32security.LookupAccountName.assert_called_once_with(None, "TestUser")
     
-    @patch('src.fix_owner.win32api')
-    @patch('src.fix_owner.win32security')
-    @patch('src.fix_owner.win32con')
+    @patch('src.security_manager.win32api')
+    @patch('src.security_manager.win32security')
+    @patch('src.security_manager.win32con')
     def test_resolve_owner_account_current_user(self, mock_win32con, mock_win32security, mock_win32api):
         """Test resolving current user account."""
         mock_sid = Mock()
@@ -156,7 +156,7 @@ class TestSecurityManager(unittest.TestCase):
         mock_win32api.GetUserNameEx.assert_called_once_with(mock_win32con.NameSamCompatible)
         mock_win32security.LookupAccountName.assert_called_once_with(None, "DOMAIN\\CurrentUser")
     
-    @patch('src.fix_owner.win32security')
+    @patch('src.security_manager.win32security')
     def test_resolve_owner_account_invalid(self, mock_win32security):
         """Test resolving invalid owner account."""
         mock_win32security.LookupAccountName.side_effect = Exception("Account not found")
@@ -168,7 +168,7 @@ class TestSecurityManager(unittest.TestCase):
     
     def test_security_manager_without_pywin32(self):
         """Test SecurityManager initialization without pywin32."""
-        with patch('src.fix_owner.PYWIN32_AVAILABLE', False):
+        with patch('src.security_manager.PYWIN32_AVAILABLE', False):
             with self.assertRaises(ImportError):
                 SecurityManager()
     

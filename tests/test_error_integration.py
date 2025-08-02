@@ -9,7 +9,8 @@ import tempfile
 import shutil
 from unittest.mock import Mock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-from src.fix_owner import SecurityManager, StatsTracker
+from src.security_manager import SecurityManager
+from src.stats_tracker import StatsTracker
 from src.filesystem_walker import FileSystemWalker
 from src.output_manager import OutputManager
 from src.error_manager import ErrorManager, ErrorCategory
