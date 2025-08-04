@@ -51,6 +51,10 @@ class FileSystemWalker:
         self.stats_tracker = stats_tracker
         self.error_manager = error_manager
         self.sid_tracker = sid_tracker
+        
+        # Track failed files and directories for output directory logging
+        self.failed_files = []
+        self.failed_directories = []
     
     def walk_filesystem(self, root_path: str, owner_sid: object, 
                        recurse: bool = False, process_files: bool = False,
@@ -208,6 +212,23 @@ class FileSystemWalker:
             # These are typically system-level issues that prevent continued processing
             if output_manager:
                 output_manager.print_general_error(f"Critical error during filesystem processing: {e}")
+            
+            # Log the critical filesystem failure with timestamp
+            if self.error_manager:
+                from error_manager import ErrorInfo, ErrorCategory
+                critical_error = ErrorInfo(
+                    category=ErrorCategory.FILESYSTEM,
+                    path=root_path,
+                    message=f"Critical filesystem processing error: {e}",
+                    original_exception=e,
+                    is_critical=True,
+                    should_terminate=True
+                )
+                self.error_manager.log_critical_failure(
+                    critical_error, 
+                    f"Failed during filesystem traversal of {root_path}"
+                )
+            
             raise
     
     def _process_directory(self, dir_path: str, owner_sid: object, 
@@ -240,8 +261,18 @@ class FileSystemWalker:
         if self.error_manager:
             # Use ErrorManager's context manager for sophisticated error handling
             # This provides error categorization, recovery strategies, and consistent reporting
-            with self.error_manager.create_exception_context("Processing directory", dir_path):
-                self._process_directory_ownership(dir_path, owner_sid, execute, output_manager)
+            try:
+                with self.error_manager.create_exception_context("Processing directory", dir_path):
+                    self._process_directory_ownership(dir_path, owner_sid, execute, output_manager)
+            except Exception as e:
+                # Collect failed directory for output directory logging even with ErrorManager
+                self.failed_directories.append({
+                    'path': dir_path,
+                    'error': str(e),
+                    'exception_type': type(e).__name__
+                })
+                # Re-raise to let ErrorManager handle it properly
+                raise
         else:
             # FALLBACK: Basic error handling when ErrorManager is not available
             # This ensures the script can still function with minimal error handling
@@ -251,6 +282,14 @@ class FileSystemWalker:
                 # Handle exception but continue processing other directories
                 # This is critical for robustness - one failed directory shouldn't stop everything
                 self.stats_tracker.increment_exceptions()
+                
+                # Collect failed directory for output directory logging
+                self.failed_directories.append({
+                    'path': dir_path,
+                    'error': str(e),
+                    'exception_type': type(e).__name__
+                })
+                
                 if output_manager:
                     output_manager.print_error(dir_path, e, is_directory=True)
     
@@ -347,8 +386,18 @@ class FileSystemWalker:
         if self.error_manager:
             # Use ErrorManager's context manager for sophisticated error handling
             # This provides error categorization, recovery strategies, and consistent reporting
-            with self.error_manager.create_exception_context("Processing file", file_path):
-                self._process_file_ownership(file_path, owner_sid, execute, output_manager)
+            try:
+                with self.error_manager.create_exception_context("Processing file", file_path):
+                    self._process_file_ownership(file_path, owner_sid, execute, output_manager)
+            except Exception as e:
+                # Collect failed file for output directory logging even with ErrorManager
+                self.failed_files.append({
+                    'path': file_path,
+                    'error': str(e),
+                    'exception_type': type(e).__name__
+                })
+                # Re-raise to let ErrorManager handle it properly
+                raise
         else:
             # FALLBACK: Basic error handling when ErrorManager is not available
             # This ensures the script can still function with minimal error handling
@@ -358,6 +407,14 @@ class FileSystemWalker:
                 # Handle exception but continue processing other files
                 # This is critical for robustness - one failed file shouldn't stop everything
                 self.stats_tracker.increment_exceptions()
+                
+                # Collect failed file for output directory logging
+                self.failed_files.append({
+                    'path': file_path,
+                    'error': str(e),
+                    'exception_type': type(e).__name__
+                })
+                
                 if output_manager:
                     output_manager.print_error(file_path, e, is_directory=False)
     
@@ -448,3 +505,78 @@ class FileSystemWalker:
         
         # If the parent is the root, then this is a top-level directory
         return parent_dir == normalized_root
+    
+    def write_failed_files_log(self) -> None:
+        """
+        Write failed files and directories to the output directory.
+        
+        This method creates a comprehensive log of all files and directories
+        that failed during processing, writing it to the output directory
+        for later analysis and troubleshooting.
+        """
+        if not self.error_manager:
+            return
+        
+        # Only write log if there are failures to report
+        total_failures = len(self.failed_files) + len(self.failed_directories)
+        if total_failures == 0:
+            return
+        
+        # Prepare failure summary
+        summary = f"""
+FILESYSTEM PROCESSING FAILURES SUMMARY
+======================================
+Total Failed Files: {len(self.failed_files)}
+Total Failed Directories: {len(self.failed_directories)}
+Total Failures: {total_failures}
+
+This log contains all files and directories that could not be processed
+during the ownership change operation. Common causes include:
+- Access denied (insufficient permissions)
+- Files in use by other processes
+- Network connectivity issues (for network paths)
+- Corrupted file system entries
+- Invalid or inaccessible paths
+
+Review each failure to determine if manual intervention is required.
+"""
+        
+        # Combine all failures into a single list for logging
+        all_failures = []
+        
+        # Add directory failures
+        for failure in self.failed_directories:
+            all_failures.append({
+                'type': 'Directory',
+                'path': failure['path'],
+                'error': failure['error'],
+                'exception_type': failure['exception_type']
+            })
+        
+        # Add file failures
+        for failure in self.failed_files:
+            all_failures.append({
+                'type': 'File',
+                'path': failure['path'],
+                'error': failure['error'],
+                'exception_type': failure['exception_type']
+            })
+        
+        # Sort failures by path for easier review
+        all_failures.sort(key=lambda x: x['path'])
+        
+        # Convert to formatted strings for the error manager
+        formatted_failures = []
+        for failure in all_failures:
+            formatted_failures.append(
+                f"{failure['type']}: {failure['path']}\n"
+                f"  Error: {failure['error']}\n"
+                f"  Exception: {failure['exception_type']}"
+            )
+        
+        # Write the failures log using the error manager
+        self.error_manager.log_operation_failures(
+            operation="filesystem_processing",
+            failures=formatted_failures,
+            summary=summary
+        )

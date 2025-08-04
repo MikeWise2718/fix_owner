@@ -30,7 +30,7 @@ USAGE:
     
     Arguments:
         root_path       Root directory to start processing from
-        owner_account   Target owner account (default: current user)
+        owner_account   Target owner account (default: current logged-in user)
     
     Options:
         -x, --execute   Apply ownership changes (default: dry run)
@@ -60,7 +60,7 @@ EXAMPLES:
     # Quiet mode for scripted/automated execution
     python fix_owner.py E:\\Archive -x -r -q Administrator
     
-    # Use current user as target owner (no account specified)
+    # Use current logged-in user as target owner (no account specified)
     python fix_owner.py C:\\MyFolder -x -r
     
     # Domain account as target owner
@@ -130,13 +130,20 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+# YAML support for remediation file reading
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
 # Import common utilities and constants
 try:
     from .common import (
         section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE,
         SCRIPT_VERSION, MAX_PATH_LENGTH, EXIT_SUCCESS, EXIT_ERROR, EXIT_INTERRUPTED,
         PYWIN32_AVAILABLE, safe_exit, validate_path_exists, validate_path_is_directory,
-        setup_module_path
+        setup_module_path, get_execution_start_timestamp
     )
 except ImportError:
     # Fall back to absolute imports (when run as a script)
@@ -144,7 +151,7 @@ except ImportError:
         section_clr, error_clr, warn_clr, reset_clr, COLORAMA_AVAILABLE,
         SCRIPT_VERSION, MAX_PATH_LENGTH, EXIT_SUCCESS, EXIT_ERROR, EXIT_INTERRUPTED,
         PYWIN32_AVAILABLE, safe_exit, validate_path_exists, validate_path_is_directory,
-        setup_module_path
+        setup_module_path, get_execution_start_timestamp
     )
 
 # Check for pywin32 availability (imported from common)
@@ -185,8 +192,11 @@ class ExecutionOptions:
     quiet: bool = False            # -q flag: Suppress all output
     timeout: int = 0               # -ts value: Timeout in seconds
     track_sids: bool = False       # -ts/--track-sids flag: Enable SID tracking
+    yaml_remediation: str = ""     # -yr/--yaml-remediation: YAML remediation file
     root_path: str = ""            # Positional argument: Root path to process
     owner_account: str = ""        # Target owner account
+    start_timestamp: float = 0.0   # Execution start timestamp
+    start_timestamp_str: str = ""  # Formatted timestamp for filenames
 
 
 @dataclass
@@ -221,7 +231,7 @@ def parse_arguments() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description="Recursively take ownership of directories/files with orphaned SIDs.",
-        epilog="Example: python fix_owner.py C:\\MyFolder -x -r -v Administrator"
+        epilog="Examples: python fix_owner.py C:\\MyFolder -x -r -v Administrator\n          python fix_owner.py C:\\MyFolder -x -r --yaml-remediation remediation.yaml"
     )
     
     # Positional arguments
@@ -232,7 +242,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         'owner_account',
         nargs='?',
-        help='Target owner account (default: current user)'
+        help='Target owner account (default: current logged-in user)'
     )
     
     # Optional flags
@@ -275,6 +285,12 @@ def parse_arguments() -> argparse.Namespace:
         action='store_true',
         help='Enable SID tracking and generate ownership analysis report'
     )
+    parser.add_argument(
+        '-yr', '--yaml-remediation',
+        type=str,
+        metavar='FILENAME',
+        help='Read remediation plan from YAML file in current directory (uses new_owner_account for ownership changes)'
+    )
     
     args = parser.parse_args()
     
@@ -285,6 +301,14 @@ def parse_arguments() -> argparse.Namespace:
     if args.timeout < 0:
         parser.error("Timeout value must be non-negative")
     
+    # Validate YAML remediation and owner account combination
+    if args.yaml_remediation and args.owner_account:
+        parser.error("Cannot specify both owner_account and --yaml-remediation options (YAML file provides the owner account)")
+    
+    if not args.yaml_remediation and not args.owner_account:
+        # This is allowed - will use current user as default
+        pass
+    
     if not validate_path_exists(args.root_path):
         parser.error(f"Root path does not exist: {args.root_path}")
     
@@ -294,7 +318,7 @@ def parse_arguments() -> argparse.Namespace:
     return args
 
 
-def resolve_owner_account(account_name: Optional[str], output: OutputManager, security_manager: SecurityManager) -> object:
+def resolve_owner_account(account_name: Optional[str], output: OutputManager, security_manager: SecurityManager) -> tuple[object, str]:
     """
     Resolve owner account name to SID using SecurityManager with comprehensive error handling.
     
@@ -304,12 +328,12 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
     
     Args:
         account_name: Account name to resolve (e.g., "Administrator", "DOMAIN\\User"), 
-                     or None for current user
+                     or None for current logged-in user
         output: Output manager for user feedback and error reporting
         security_manager: SecurityManager instance for account resolution
         
     Returns:
-        SID object for the resolved account that can be used in ownership operations
+        Tuple of (SID object, resolved account name) for the resolved account
         
     Raises:
         SystemExit: If account cannot be resolved (critical error that prevents execution)
@@ -324,13 +348,13 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
         
         # Log additional account information in verbose mode
         if output.get_verbose_level() >= 1:
-            output.print_general_message(f"Account resolution successful for: {account_name or 'current user'}")
+            output.print_general_message(f"Account resolution successful for: {resolved_name}")
         
-        return sid
+        return sid, resolved_name
         
     except Exception as e:
         # Handle account resolution failure - this is a critical error
-        account_display = account_name or "current user"
+        account_display = account_name or "current logged-in user"
         
         # Provide detailed error information to help user resolve the issue
         output.print_invalid_owner_error(account_display, e)
@@ -347,6 +371,82 @@ def resolve_owner_account(account_name: Optional[str], output: OutputManager, se
         # Exit with error code since we cannot proceed without a valid target account
         safe_exit(EXIT_ERROR)
 
+
+def load_yaml_remediation(yaml_filename: str, output: OutputManager) -> Optional[str]:
+    """
+    Load remediation plan from YAML file and extract new_owner_account.
+    
+    This function reads a YAML remediation file (typically generated by a previous
+    run with --track-sids) and extracts the recommended new_owner_account from
+    the remediation plan. This allows for automated remediation based on previous
+    analysis.
+    
+    Args:
+        yaml_filename: Name of YAML file in current working directory
+        output: Output manager for user feedback and error reporting
+        
+    Returns:
+        The new_owner_account string from the remediation plan, or None if not found
+        
+    Raises:
+        SystemExit: If YAML file cannot be read or parsed (critical error)
+    """
+    if not YAML_AVAILABLE:
+        output.print_general_error("PyYAML is not installed. Install with: pip install PyYAML")
+        safe_exit(EXIT_ERROR)
+    
+    yaml_path = os.path.join(os.getcwd(), yaml_filename)
+    
+    if not os.path.exists(yaml_path):
+        output.print_general_error(f"YAML remediation file not found: {yaml_path}")
+        safe_exit(EXIT_ERROR)
+    
+    try:
+        with open(yaml_path, 'r', encoding='utf-8') as file:
+            yaml_data = yaml.safe_load(file)
+        
+        if not yaml_data:
+            output.print_general_error(f"YAML file is empty or invalid: {yaml_filename}")
+            safe_exit(EXIT_ERROR)
+        
+        # Extract new_owner_account from the first orphaned SID entry
+        # The YAML structure is: orphaned_sids -> [list] -> recommended_remediation -> new_owner_account
+        if 'orphaned_sids' in yaml_data and yaml_data['orphaned_sids']:
+            first_sid = yaml_data['orphaned_sids'][0]
+            if 'recommended_remediation' in first_sid:
+                remediation = first_sid['recommended_remediation']
+                if 'new_owner_account' in remediation:
+                    new_owner = remediation['new_owner_account']
+                    
+                    # Display loaded remediation information
+                    if output.get_verbose_level() >= 1:
+                        output.print_general_message(f"Loaded YAML remediation file: {yaml_filename}")
+                        output.print_info_pair("  New owner account", new_owner)
+                        
+                        # Show additional remediation details if available
+                        if 'action_required' in remediation:
+                            output.print_info_pair("  Action required", remediation['action_required'])
+                        
+                        # Show impact analysis if available
+                        if 'impact_analysis' in first_sid:
+                            impact = first_sid['impact_analysis']
+                            if 'total_items_affected' in impact:
+                                output.print_info_pair("  Items affected", str(impact['total_items_affected']))
+                            if 'remediation_priority' in impact:
+                                output.print_info_pair("  Priority", impact['remediation_priority'])
+                    
+                    return new_owner
+        
+        output.print_general_error(f"No new_owner_account found in YAML file: {yaml_filename}")
+        output.print_general_message("Expected structure: orphaned_sids[0].recommended_remediation.new_owner_account")
+        safe_exit(EXIT_ERROR)
+        
+    except yaml.YAMLError as e:
+        output.print_general_error(f"Error parsing YAML file {yaml_filename}: {e}")
+        safe_exit(EXIT_ERROR)
+    except Exception as e:
+        output.print_general_error(f"Error reading YAML file {yaml_filename}: {e}")
+        safe_exit(EXIT_ERROR)
 
 
 def process_filesystem(options: ExecutionOptions, owner_sid: object, 
@@ -400,6 +500,10 @@ def process_filesystem(options: ExecutionOptions, owner_sid: object,
         output_manager=output,
         timeout_manager=timeout_manager
     )
+    
+    # Write failed files log to output directory after processing completes
+    # This provides a comprehensive record of any files that could not be processed
+    walker.write_failed_files_log()
 
 
 def main() -> None:
@@ -428,6 +532,10 @@ def main() -> None:
         2 (EXIT_INTERRUPTED): User interruption (Ctrl+C)
     """
     try:
+        # PHASE 0: Record execution start time for logging and failure tracking
+        # This timestamp will be used for constructing failure log filenames
+        start_timestamp, start_timestamp_str = get_execution_start_timestamp()
+        
         # PHASE 1: Command-line argument parsing and validation
         # Parse and validate all command-line arguments, ensuring required parameters
         # are present and option combinations are valid
@@ -443,8 +551,11 @@ def main() -> None:
             quiet=args.quiet,              # Whether to suppress all output
             timeout=args.timeout,          # Maximum execution time in seconds
             track_sids=args.track_sids,    # Whether to enable SID tracking
+            yaml_remediation=args.yaml_remediation or "",  # YAML remediation file
             root_path=args.root_path,      # Starting directory for processing
-            owner_account=args.owner_account or ""  # Target owner account
+            owner_account=args.owner_account or "",  # Target owner account
+            start_timestamp=start_timestamp,         # Execution start timestamp
+            start_timestamp_str=start_timestamp_str  # Formatted timestamp for filenames
         )
         
         # PHASE 2: Component initialization and dependency injection
@@ -462,22 +573,19 @@ def main() -> None:
         output.print_general_message("fix_owner - a utility to change the owner on sets of Windows 11 files")
         output.print_info_pair("Script version", SCRIPT_VERSION)
         output.print_info_pair("Python version", sys.version)
+        output.print_info_pair("Execution started", options.start_timestamp_str.replace("_", " at "))
         
         # Initialize comprehensive error manager with dependencies
         # This provides centralized error handling, categorization, and recovery
-        error_manager = ErrorManager(stats_tracker=stats, output_manager=output)
+        error_manager = ErrorManager(
+            stats_tracker=stats, 
+            output_manager=output, 
+            start_timestamp_str=options.start_timestamp_str
+        )
         
         # Initialize security manager with error handling integration
         # This handles all Windows security API operations with proper error handling
         security_manager = SecurityManager(error_manager=error_manager)
-        
-        # Initialize SID tracker if requested
-        # This provides comprehensive SID tracking and reporting functionality
-        sid_tracker = None
-        if options.track_sids:
-            sid_tracker = SidTracker(security_manager=security_manager)
-            if output.get_verbose_level() >= 1:
-                output.print_general_message("SID tracking enabled - ownership analysis will be generated")
         
         # PHASE 3: Security validation and privilege checking
         # Validate that we have Administrator privileges required for ownership changes
@@ -494,16 +602,45 @@ def main() -> None:
         else:
             output.print_dry_run_notice()
         
-        # PHASE 5: Target owner account resolution and validation
+        # PHASE 5: YAML remediation file processing (if specified)
+        # Load remediation plan from YAML file and override owner account
+        if options.yaml_remediation:
+            yaml_owner_account = load_yaml_remediation(options.yaml_remediation, output)
+            if yaml_owner_account:
+                # Override the owner account with the one from YAML file
+                original_owner = options.owner_account
+                options.owner_account = yaml_owner_account
+                
+                if output.get_verbose_level() >= 1:
+                    if original_owner:
+                        output.print_general_message(f"Owner account overridden by YAML remediation:")
+                        output.print_info_pair("  Original", original_owner)
+                        output.print_info_pair("  From YAML", yaml_owner_account)
+                    else:
+                        output.print_general_message(f"Owner account set from YAML remediation: {yaml_owner_account}")
+        
+        # PHASE 6: Target owner account resolution and validation
         # Resolve the target owner account to a SID and validate it exists
         # This is critical - we cannot proceed without a valid target account
-        owner_sid = resolve_owner_account(options.owner_account, output, security_manager)
+        owner_sid, resolved_owner_name = resolve_owner_account(options.owner_account, output, security_manager)
         
-        # PHASE 6: Operation startup information and logging
+        # Initialize SID tracker if requested (after account resolution)
+        # This provides comprehensive SID tracking and reporting functionality
+        sid_tracker = None
+        if options.track_sids:
+            sid_tracker = SidTracker(
+                security_manager=security_manager,
+                start_timestamp_str=options.start_timestamp_str,
+                target_owner_account=resolved_owner_name
+            )
+            if output.get_verbose_level() >= 1:
+                output.print_general_message("SID tracking enabled - ownership analysis will be generated")
+        
+        # PHASE 7: Operation startup information and logging
         # Provide user with comprehensive information about what will be processed
         output.print_startup_info(
             options.root_path,
-            options.owner_account or "current user",
+            resolved_owner_name,
             options.recurse,
             options.files
         )
@@ -514,7 +651,7 @@ def main() -> None:
             if options.timeout > 0:
                 output.print_info_pair("Execution timeout", f"{options.timeout} seconds")
         
-        # PHASE 7: Timeout configuration and setup
+        # PHASE 8: Timeout configuration and setup
         # Initialize timeout manager for handling execution time limits
         timeout_manager = TimeoutManager(options.timeout)
         
@@ -526,7 +663,7 @@ def main() -> None:
                 output.print_general_message("Timeout handler configured")
         
         try:
-            # PHASE 8: Main filesystem processing
+            # PHASE 9: Main filesystem processing
             # This is where the actual work happens - traverse directories and fix ownership
             # All error handling and recovery is managed by the individual components
             if output.get_verbose_level() >= 1:
@@ -541,7 +678,7 @@ def main() -> None:
                 output.print_general_message(f"{section_clr}{'=' * 50}{reset_clr}")
             
         finally:
-            # PHASE 9: Cleanup and resource management
+            # PHASE 10: Cleanup and resource management
             # Always cleanup timeout resources, even if processing was interrupted
             timeout_manager.cancel_timeout()
             if output.get_verbose_level() >= 1:
@@ -570,6 +707,19 @@ def main() -> None:
     except Exception as e:
         # Handle any unexpected critical errors
         error_message = f"Critical error: {e}"
+        
+        # Log critical failure to timestamped file if error_manager is available
+        if 'error_manager' in locals():
+            from error_manager import ErrorInfo, ErrorCategory
+            critical_error = ErrorInfo(
+                category=ErrorCategory.CRITICAL,
+                path=None,
+                message=error_message,
+                original_exception=e,
+                is_critical=True,
+                should_terminate=True
+            )
+            error_manager.log_critical_failure(critical_error, "Unhandled exception in main execution")
         
         # In verbose mode, provide additional debugging information
         if 'output' in locals() and output.get_verbose_level() >= 1:

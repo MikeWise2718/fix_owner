@@ -1,0 +1,97 @@
+metadata:
+  title: Orphaned SID Remediation Plan
+  description: List of orphaned SIDs found during ownership analysis and their recommended
+    replacements
+  generated_by: fix_owner script
+  export_timestamp: '2025-08-04 13:16:11'
+  execution_start_timestamp: 20250804 at 131601
+  format_version: '1.0'
+remediation_info:
+  target_owner_account: SPEAROW\mike
+  total_orphaned_sids: 3
+  remediation_command: python fix_owner.py <path> -x -r -f "SPEAROW\mike"
+  notes:
+  - Run the remediation command to fix orphaned ownership
+  - Use -x flag to apply changes (remove for dry-run)
+  - Use -r flag to process subdirectories recursively
+  - Use -f flag to process files in addition to directories
+  - Always test with dry-run first before applying changes
+orphaned_sids:
+  PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802:
+    current_status:
+      sid: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802
+      account_name: '<Orphaned SID: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802>'
+      status: ORPHANED
+      description: SID does not correspond to any existing account
+    impact_analysis:
+      files_affected: 27265
+      directories_affected: 3595
+      total_items_affected: 30860
+      file_percentage: 82.91
+      directory_percentage: 73.07
+      remediation_priority: HIGH
+    recommended_remediation:
+      new_owner_account: SPEAROW\mike
+      action_required: Change ownership to specified account
+      command_example: python fix_owner.py <path> -x -r -f "SPEAROW\mike"
+      verification_steps:
+      - Run with dry-run mode first (without -x flag)
+      - Verify the target account exists and is accessible
+      - Apply changes with -x flag
+      - Verify ownership changes were successful
+    additional_info:
+      sid_type: Unknown SID Type
+      likely_cause: System migration, domain change, or account deletion
+      risk_assessment: Low risk - High impact remediation recommended
+  PySID:S-1-5-21-1237068614-2261452837-2833372273-1002:
+    current_status:
+      sid: PySID:S-1-5-21-1237068614-2261452837-2833372273-1002
+      account_name: '<Orphaned SID: PySID:S-1-5-21-1237068614-2261452837-2833372273-1002>'
+      status: ORPHANED
+      description: SID does not correspond to any existing account
+    impact_analysis:
+      files_affected: 5621
+      directories_affected: 1325
+      total_items_affected: 6946
+      file_percentage: 17.09
+      directory_percentage: 26.93
+      remediation_priority: HIGH
+    recommended_remediation:
+      new_owner_account: SPEAROW\mike
+      action_required: Change ownership to specified account
+      command_example: python fix_owner.py <path> -x -r -f "SPEAROW\mike"
+      verification_steps:
+      - Run with dry-run mode first (without -x flag)
+      - Verify the target account exists and is accessible
+      - Apply changes with -x flag
+      - Verify ownership changes were successful
+    additional_info:
+      sid_type: Unknown SID Type
+      likely_cause: System migration, domain change, or account deletion
+      risk_assessment: Low risk - High impact remediation recommended
+  PySID:S-1-5-21-3178643122-3636507100-3144102440-1007:
+    current_status:
+      sid: PySID:S-1-5-21-3178643122-3636507100-3144102440-1007
+      account_name: '<Orphaned SID: PySID:S-1-5-21-3178643122-3636507100-3144102440-1007>'
+      status: ORPHANED
+      description: SID does not correspond to any existing account
+    impact_analysis:
+      files_affected: 1
+      directories_affected: 0
+      total_items_affected: 1
+      file_percentage: 0.0
+      directory_percentage: 0.0
+      remediation_priority: LOW
+    recommended_remediation:
+      new_owner_account: SPEAROW\mike
+      action_required: Change ownership to specified account
+      command_example: python fix_owner.py <path> -x -r -f "SPEAROW\mike"
+      verification_steps:
+      - Run with dry-run mode first (without -x flag)
+      - Verify the target account exists and is accessible
+      - Apply changes with -x flag
+      - Verify ownership changes were successful
+    additional_info:
+      sid_type: Unknown SID Type
+      likely_cause: System migration, domain change, or account deletion
+      risk_assessment: Very low risk - Low impact remediation optional

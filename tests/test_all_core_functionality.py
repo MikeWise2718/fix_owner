@@ -37,7 +37,7 @@ except ImportError as e:
     sys.exit(1)
 
 
-class TestResults:
+class ResultsTracker:
     """Container for test results and statistics."""
     
     def __init__(self):
@@ -203,7 +203,7 @@ def main():
     print("🚀 Starting comprehensive unit tests for fix-owner script core functionality")
     print("This will test all components with mocked dependencies for reliable testing")
     
-    results = TestResults()
+    results = ResultsTracker()
     
     # Run unittest-based test suites
     unittest_tests = [

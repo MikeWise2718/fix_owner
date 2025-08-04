@@ -191,8 +191,9 @@ class TestSidTracker(unittest.TestCase):
     
     def test_generate_report_with_output_manager(self):
         """Test report generation with OutputManager."""
-        # Setup mock output manager
+        # Setup mock output manager with proper get_verbose_level method
         mock_output = Mock()
+        mock_output.get_verbose_level.return_value = 1  # Set a valid verbose level
         
         # Add some test data
         self.mock_security_manager.is_sid_valid.return_value = True

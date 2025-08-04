@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "report_type": "SID Ownership Analysis",
+    "generated_by": "fix_owner script",
+    "format_version": "1.0"
+  },
+  "summary": {
+    "export_timestamp": "2025-08-04 15:39:39",
+    "execution_start_timestamp": "20250804 at 153929",
+    "total_files_analyzed": 32887,
+    "total_directories_analyzed": 4920,
+    "unique_sids_found": 3,
+    "valid_sids_count": 0,
+    "orphaned_sids_count": 3,
+    "total_items_analyzed": 37807
+  },
+  "sids": {
+    "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802": {
+      "sid": "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802",
+      "account_name": "<Orphaned SID: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802>",
+      "status": "ORPHANED",
+      "status_description": "SID does not correspond to any existing account",
+      "is_valid": false,
+      "occurrences": {
+        "files": 27265,
+        "directories": 3595,
+        "total": 30860
+      },
+      "percentages": {
+        "files": 82.91,
+        "directories": 73.07,
+        "total": 81.63
+      },
+      "analysis": {
+        "is_most_common_for_files": true,
+        "is_most_common_for_directories": true,
+        "is_most_common_overall": true
+      }
+    },
+    "PySID:S-1-5-21-1237068614-2261452837-2833372273-1002": {
+      "sid": "PySID:S-1-5-21-1237068614-2261452837-2833372273-1002",
+      "account_name": "<Orphaned SID: PySID:S-1-5-21-1237068614-2261452837-2833372273-1002>",
+      "status": "ORPHANED",
+      "status_description": "SID does not correspond to any existing account",
+      "is_valid": false,
+      "occurrences": {
+        "files": 5621,
+        "directories": 1325,
+        "total": 6946
+      },
+      "percentages": {
+        "files": 17.09,
+        "directories": 26.93,
+        "total": 18.37
+      },
+      "analysis": {
+        "is_most_common_for_files": false,
+        "is_most_common_for_directories": false,
+        "is_most_common_overall": false
+      }
+    },
+    "PySID:S-1-5-21-3178643122-3636507100-3144102440-1007": {
+      "sid": "PySID:S-1-5-21-3178643122-3636507100-3144102440-1007",
+      "account_name": "<Orphaned SID: PySID:S-1-5-21-3178643122-3636507100-3144102440-1007>",
+      "status": "ORPHANED",
+      "status_description": "SID does not correspond to any existing account",
+      "is_valid": false,
+      "occurrences": {
+        "files": 1,
+        "directories": 0,
+        "total": 1
+      },
+      "percentages": {
+        "files": 0.0,
+        "directories": 0.0,
+        "total": 0.0
+      },
+      "analysis": {
+        "is_most_common_for_files": false,
+        "is_most_common_for_directories": false,
+        "is_most_common_overall": false
+      }
+    }
+  },
+  "insights": {
+    "most_common_sids": {
+      "files": {
+        "sid": "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802",
+        "account_name": "<Orphaned SID: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802>",
+        "count": 27265
+      },
+      "directories": {
+        "sid": "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802",
+        "account_name": "<Orphaned SID: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802>",
+        "count": 3595
+      },
+      "overall": {
+        "sid": "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802",
+        "account_name": "<Orphaned SID: PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802>",
+        "total_count": 30860
+      }
+    },
+    "distribution": {
+      "valid_sids_list": [],
+      "orphaned_sids_list": [
+        "PySID:S-1-5-21-1237068614-2261452837-2833372273-1002",
+        "PySID:S-1-12-1-351082198-1115380215-1227410600-1579940802",
+        "PySID:S-1-5-21-3178643122-3636507100-3144102440-1007"
+      ],
+      "valid_percentage": 0.0,
+      "orphaned_percentage": 100.0
+    },
+    "recommendations": [
+      "Found 3 orphaned SID(s) that should be addressed",
+      "Consider running the script with -x flag to fix orphaned ownership"
+    ]
+  }
+}

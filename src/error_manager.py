@@ -62,16 +62,18 @@ class ErrorManager:
     - Administrator privilege validation
     """
     
-    def __init__(self, stats_tracker=None, output_manager=None):
+    def __init__(self, stats_tracker=None, output_manager=None, start_timestamp_str=None):
         """
         Initialize ErrorManager with optional dependencies.
         
         Args:
             stats_tracker: StatsTracker instance for counting exceptions
             output_manager: OutputManager instance for error reporting
+            start_timestamp_str: Formatted timestamp string for failure log filenames
         """
         self.stats_tracker = stats_tracker
         self.output_manager = output_manager
+        self.start_timestamp_str = start_timestamp_str or "unknown_time"
         self.error_handlers: Dict[ErrorCategory, Callable] = {
             ErrorCategory.SECURITY: self._handle_security_error,
             ErrorCategory.FILESYSTEM: self._handle_filesystem_error,
@@ -346,6 +348,132 @@ class ErrorManager:
         }
         
         return solutions.get(error_category, ["Contact system administrator for assistance"])
+    
+    def create_failure_log_filename(self, operation: str, extension: str = "log") -> str:
+        """
+        Create a timestamped filename for failure logs in the output directory.
+        
+        Args:
+            operation: Description of the operation (e.g., "security_errors", "filesystem_failures")
+            extension: File extension (default: "log")
+            
+        Returns:
+            Full path to the log file in the output directory
+        """
+        # Import here to avoid circular imports
+        try:
+            from .common import get_output_file_path
+        except ImportError:
+            from common import get_output_file_path
+        
+        # Sanitize operation name for filename
+        safe_operation = "".join(c for c in operation if c.isalnum() or c in "_-").lower()
+        filename = f"fix_owner_{safe_operation}_{self.start_timestamp_str}.{extension}"
+        return get_output_file_path(filename)
+    
+    def write_failure_log(self, filename: str, content: str, append: bool = True) -> bool:
+        """
+        Write failure information to a timestamped log file.
+        
+        Args:
+            filename: Name of the log file
+            content: Content to write to the file
+            append: Whether to append to existing file (True) or overwrite (False)
+            
+        Returns:
+            True if successful, False if failed
+        """
+        try:
+            mode = "a" if append else "w"
+            with open(filename, mode, encoding="utf-8") as f:
+                f.write(content)
+                f.write("\n")
+            
+            if self.output_manager and self.output_manager.get_verbose_level() >= 2:
+                self.output_manager.print_general_message(f"Failure log written to: {filename}")
+            
+            return True
+            
+        except Exception as e:
+            if self.output_manager:
+                self.output_manager.print_general_error(f"Failed to write log file {filename}: {e}")
+            return False
+    
+    def log_critical_failure(self, error_info: ErrorInfo, additional_context: str = "") -> None:
+        """
+        Log critical failures to a timestamped file for debugging.
+        
+        Args:
+            error_info: ErrorInfo object with failure details
+            additional_context: Additional context information
+        """
+        filename = self.create_failure_log_filename("critical_failures")
+        
+        import time
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        
+        log_content = f"""
+=== CRITICAL FAILURE LOG ===
+Timestamp: {timestamp}
+Category: {error_info.category.value}
+Path: {error_info.path or 'N/A'}
+Message: {error_info.message}
+Exception Type: {type(error_info.original_exception).__name__}
+Exception Details: {str(error_info.original_exception)}
+
+Additional Context: {additional_context}
+
+Traceback:
+{traceback.format_exception(type(error_info.original_exception), error_info.original_exception, error_info.original_exception.__traceback__)}
+
+=== END CRITICAL FAILURE LOG ===
+"""
+        
+        self.write_failure_log(filename, log_content)
+    
+    def log_operation_failures(self, operation: str, failures: list, summary: str = "") -> None:
+        """
+        Log multiple operation failures to a timestamped file.
+        
+        Args:
+            operation: Name of the operation (e.g., "filesystem_operations")
+            failures: List of failure descriptions or ErrorInfo objects
+            summary: Optional summary of the failures
+        """
+        filename = self.create_failure_log_filename(f"{operation}_failures")
+        
+        import time
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        
+        log_content = f"""
+=== {operation.upper()} FAILURES LOG ===
+Timestamp: {timestamp}
+Total Failures: {len(failures)}
+
+{summary}
+
+Failure Details:
+"""
+        
+        for i, failure in enumerate(failures, 1):
+            if isinstance(failure, ErrorInfo):
+                log_content += f"""
+Failure #{i}:
+  Path: {failure.path or 'N/A'}
+  Category: {failure.category.value}
+  Message: {failure.message}
+  Exception: {type(failure.original_exception).__name__}: {str(failure.original_exception)}
+"""
+            else:
+                log_content += f"""
+Failure #{i}: {str(failure)}
+"""
+        
+        log_content += f"""
+=== END {operation.upper()} FAILURES LOG ===
+"""
+        
+        self.write_failure_log(filename, log_content)
 
 
 class ExceptionContext:

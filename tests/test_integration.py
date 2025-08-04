@@ -36,7 +36,7 @@ from src.error_manager import ErrorManager
 from src.timeout_manager import TimeoutManager
 
 
-class TestDirectoryStructure:
+class DirectoryStructureHelper:
     """Helper class to create test directory structures with known ownership scenarios."""
     
     def __init__(self, base_path: str):
@@ -205,7 +205,7 @@ class TestIntegrationWorkflow(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp(prefix='fix_owner_integration_')
-        self.dir_structure = TestDirectoryStructure(self.test_dir)
+        self.dir_structure = DirectoryStructureHelper(self.test_dir)
         
         # Create mock components for controlled testing
         self.mock_security_manager = Mock(spec=SecurityManager)
@@ -512,7 +512,7 @@ class TestCommandLineIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp(prefix='fix_owner_cli_')
-        self.dir_structure = TestDirectoryStructure(self.test_dir)
+        self.dir_structure = DirectoryStructureHelper(self.test_dir)
         self.structure = self.dir_structure.create_simple_structure()
     
     def tearDown(self):
@@ -598,7 +598,7 @@ class TestPerformanceIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp(prefix='fix_owner_perf_')
-        self.dir_structure = TestDirectoryStructure(self.test_dir)
+        self.dir_structure = DirectoryStructureHelper(self.test_dir)
         
         # Create mock components optimized for performance testing
         self.mock_security_manager = Mock(spec=SecurityManager)
@@ -783,7 +783,7 @@ class TestEndToEndScenarios(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.test_dir = tempfile.mkdtemp(prefix='fix_owner_e2e_')
-        self.dir_structure = TestDirectoryStructure(self.test_dir)
+        self.dir_structure = DirectoryStructureHelper(self.test_dir)
     
     def tearDown(self):
         """Clean up test fixtures."""

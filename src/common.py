@@ -96,6 +96,63 @@ def format_elapsed_time(start_time: float) -> float:
     return time.time() - start_time
 
 
+def format_timestamp_for_filename(timestamp: float = None) -> str:
+    """
+    Format a timestamp for use in filenames.
+    
+    Args:
+        timestamp: Timestamp to format (default: current time)
+        
+    Returns:
+        Formatted timestamp string suitable for filenames (YYYYMMDD_HHMMSS)
+    """
+    if timestamp is None:
+        timestamp = time.time()
+    
+    # Convert to local time and format as YYYYMMDD_HHMMSS
+    time_struct = time.localtime(timestamp)
+    return time.strftime("%Y%m%d_%H%M%S", time_struct)
+
+
+def get_execution_start_timestamp() -> tuple[float, str]:
+    """
+    Get the current timestamp and its formatted filename version.
+    
+    Returns:
+        Tuple of (timestamp_float, formatted_filename_string)
+    """
+    timestamp = get_current_timestamp()
+    formatted = format_timestamp_for_filename(timestamp)
+    return timestamp, formatted
+
+
+def ensure_output_directory() -> str:
+    """
+    Ensure the output directory exists and return its path.
+    
+    Returns:
+        Path to the output directory
+    """
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    return output_dir
+
+
+def get_output_file_path(filename: str) -> str:
+    """
+    Get the full path for an output file in the output directory.
+    
+    Args:
+        filename: Name of the file
+        
+    Returns:
+        Full path to the file in the output directory
+    """
+    output_dir = ensure_output_directory()
+    return os.path.join(output_dir, filename)
+
+
 def setup_module_path() -> None:
     """
     Set up module path for script execution.

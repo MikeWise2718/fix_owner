@@ -196,14 +196,14 @@ class SecurityManager:
         """
         Convert account name to SID using Windows Security APIs.
         
-        This method resolves either a specified account name or the current user
+        This method resolves either a specified account name or the current logged-in user
         to a Security Identifier (SID) that can be used for ownership operations.
         It handles both local and domain accounts properly and provides detailed
         account information for debugging purposes.
         
         Args:
             account_name: Account name to resolve (e.g., "Administrator", "DOMAIN\\\\User"), 
-                         or None to use current user
+                         or None to use current logged-in user
             
         Returns:
             Tuple of (SID object, resolved account name with domain)
@@ -237,7 +237,7 @@ class SecurityManager:
                             pass
                         
             else:
-                # Use current user - get the full username with domain
+                # Use current logged-in user - get the full username with domain
                 current_user = win32api.GetUserNameEx(win32con.NameSamCompatible)
                 sid, domain, account_type = win32security.LookupAccountName(None, current_user)
                 resolved_name = current_user
@@ -246,7 +246,7 @@ class SecurityManager:
             
         except Exception as e:
             # Handle account resolution errors
-            account_display = account_name or "current user"
+            account_display = account_name or "current logged-in user"
             if self.error_manager:
                 error_info = self.error_manager.handle_exception(
                     e, context=f"Resolving account '{account_display}'", critical=True

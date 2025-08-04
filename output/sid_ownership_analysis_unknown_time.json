@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "report_type": "SID Ownership Analysis",
+    "generated_by": "fix_owner script",
+    "format_version": "1.0"
+  },
+  "summary": {
+    "export_timestamp": "2025-08-04 17:33:03",
+    "execution_start_timestamp": "unknown at time",
+    "total_files_analyzed": 1,
+    "total_directories_analyzed": 0,
+    "unique_sids_found": 1,
+    "valid_sids_count": 1,
+    "orphaned_sids_count": 0,
+    "total_items_analyzed": 1
+  },
+  "sids": {
+    "S-1-5-21-1234567890-1234567890-1234567890-1001": {
+      "sid": "S-1-5-21-1234567890-1234567890-1234567890-1001",
+      "account_name": "<Valid SID: S-1-5-21-1234567890-1234567890-1234567890-1001>",
+      "status": "VALID",
+      "status_description": "SID corresponds to an existing account",
+      "is_valid": true,
+      "occurrences": {
+        "files": 1,
+        "directories": 0,
+        "total": 1
+      },
+      "percentages": {
+        "files": 100.0,
+        "directories": 0,
+        "total": 100.0
+      },
+      "analysis": {
+        "is_most_common_for_files": true,
+        "is_most_common_for_directories": true,
+        "is_most_common_overall": true
+      }
+    }
+  },
+  "insights": {
+    "most_common_sids": {
+      "files": {
+        "sid": "S-1-5-21-1234567890-1234567890-1234567890-1001",
+        "account_name": "<Valid SID: S-1-5-21-1234567890-1234567890-1234567890-1001>",
+        "count": 1
+      },
+      "directories": {
+        "sid": "S-1-5-21-1234567890-1234567890-1234567890-1001",
+        "account_name": "<Valid SID: S-1-5-21-1234567890-1234567890-1234567890-1001>",
+        "count": 0
+      },
+      "overall": {
+        "sid": "S-1-5-21-1234567890-1234567890-1234567890-1001",
+        "account_name": "<Valid SID: S-1-5-21-1234567890-1234567890-1234567890-1001>",
+        "total_count": 1
+      }
+    },
+    "distribution": {
+      "valid_sids_list": [
+        "S-1-5-21-1234567890-1234567890-1234567890-1001"
+      ],
+      "orphaned_sids_list": [],
+      "valid_percentage": 100.0,
+      "orphaned_percentage": 0.0
+    },
+    "recommendations": [
+      "Found 1 valid SID(s) with proper ownership"
+    ]
+  }
+}
